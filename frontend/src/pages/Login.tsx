@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { useAuth } from "@/hooks/auth";
 import { ApiError } from "@/services/api";
+import { LANGS, t, useI18n } from "@/i18n";
 
 export default function LoginPage({ setupRequired }: { setupRequired?: boolean }) {
   const { login } = useAuth();
+  const { lang, setLang } = useI18n();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>();
@@ -14,7 +16,7 @@ export default function LoginPage({ setupRequired }: { setupRequired?: boolean }
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!username || !password) {
-      setError("Enter username and password");
+      setError(t("Enter username and password"));
       return;
     }
     setBusy(true);
@@ -22,7 +24,7 @@ export default function LoginPage({ setupRequired }: { setupRequired?: boolean }
     try {
       await login(username, password);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
+      setError(t(err instanceof ApiError ? err.message : "Login failed"));
     } finally {
       setBusy(false);
     }
@@ -38,24 +40,29 @@ export default function LoginPage({ setupRequired }: { setupRequired?: boolean }
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
           {setupRequired ? (
             <div className="space-y-3 text-[13px]">
-              <h1 className="text-base font-semibold">Create the admin account</h1>
-              <p className="text-muted-foreground">No admin user exists yet. For security this is done on the server, not in the browser:</p>
+              <h1 className="text-base font-semibold">{t("Create the admin account")}</h1>
+              <p className="text-muted-foreground">{t("No admin user exists yet. For security this is done on the server, not in the browser:")}</p>
               <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{`# Docker
 docker compose exec researchos python -m app.cli set-password
 
 # or set RESEARCHOS_ADMIN_PASSWORD in .env and restart`}</pre>
-              <Button variant="secondary" onClick={() => window.location.reload()}>I’ve done this — reload</Button>
+              <Button variant="secondary" onClick={() => window.location.reload()}>{t("I’ve done this — reload")}</Button>
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4" noValidate>
-              <h1 className="text-base font-semibold">Sign in</h1>
+              <h1 className="text-base font-semibold">{t("Sign in")}</h1>
               <Field label="Username">{(id) => <Input id={id} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />}</Field>
               <Field label="Password" error={error}>{(id) => <Input id={id} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />}</Field>
-              <Button type="submit" className="w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
+              <Button type="submit" className="w-full" disabled={busy}>{busy ? t("Signing in…") : t("Sign in")}</Button>
             </form>
           )}
         </div>
-        <p className="mt-4 text-center text-xs text-muted-foreground">Self-hosted research portfolio · REST · MCP</p>
+        <p className="mt-4 text-center text-xs text-muted-foreground">{t("Self-hosted research portfolio · REST · MCP")}</p>
+        <div className="mt-3 flex justify-center gap-3 text-xs">
+          {LANGS.map((l) => (
+            <button key={l.value} type="button" onClick={() => setLang(l.value)} className={lang === l.value ? "font-semibold text-foreground" : "cursor-pointer text-muted-foreground hover:text-foreground"}>{l.label}</button>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Dialog } from "@/components/ui/overlay";
 import { useMilestones, useProjects, useWrite } from "@/hooks/queries";
 import { api, type RunInput } from "@/services/api";
+import { t } from "@/i18n";
 import {
   EXPERIMENT_STATUSES, EXPERIMENT_TYPES, HEALTHS, MILESTONE_STATUSES, PRIORITIES, RUN_STATUSES, STAGES,
   TASK_STATUSES, VERIFICATION_STATUSES,
@@ -48,13 +49,13 @@ function FormDialog({ open, onOpenChange, title, description, onSubmit, busy, su
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={title}
-      description={description}
+      title={t(title)}
+      description={description && t(description)}
       wide={wide}
       footer={
         <>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="submit" form={formId} disabled={busy}>{busy ? "Saving…" : submitLabel}</Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
+          <Button type="submit" form={formId} disabled={busy}>{busy ? t("Saving…") : t(submitLabel)}</Button>
         </>
       }
     >
@@ -365,7 +366,7 @@ export function RunFormDialog({ open, onOpenChange, experimentId, run }: {
   };
   const { values: v, errors: e, set } = f;
   return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title={run ? `Edit run ${run.external_run_id}` : "Add run"} description="Store metadata and links only — keep checkpoints, videos and raw logs in your storage." onSubmit={submit} busy={m.isPending} submitLabel={run ? "Save" : "Add run"} wide>
+    <FormDialog open={open} onOpenChange={onOpenChange} title={run ? t("Edit run {id}", { id: run.external_run_id }) : "Add run"} description="Store metadata and links only — keep checkpoints, videos and raw logs in your storage." onSubmit={submit} busy={m.isPending} submitLabel={run ? "Save" : "Add run"} wide>
       {!run && <Field label="Run ID" required error={e.external_run_id} hint="Re-using an ID updates that run">{(id) => <Input id={id} value={v.external_run_id} onChange={set("external_run_id")} autoFocus aria-invalid={!!e.external_run_id} placeholder="wandb-3f9x2 or a1b2c3d-seed0" />}</Field>}
       <Field label="Seed" error={e.seed}>{(id) => <Input id={id} value={v.seed} onChange={set("seed")} inputMode="numeric" />}</Field>
       <Field label="Git commit">{(id) => <Input id={id} value={v.git_commit} onChange={set("git_commit")} className="font-mono" />}</Field>
@@ -377,8 +378,8 @@ export function RunFormDialog({ open, onOpenChange, experimentId, run }: {
       <Field label="Finished">{(id) => <Input id={id} type="datetime-local" value={v.finished_at} onChange={set("finished_at")} />}</Field>
       <div className="sm:col-span-2">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Metrics</span>
-          <Button size="sm" variant="ghost" onClick={() => setMetrics((r) => [...r, { name: "", value: "", unit: "", description: "" }])}><Plus /> Metric</Button>
+          <span className="text-xs font-medium text-muted-foreground">{t("Metrics")}</span>
+          <Button size="sm" variant="ghost" onClick={() => setMetrics((r) => [...r, { name: "", value: "", unit: "", description: "" }])}><Plus /> {t("Metric")}</Button>
         </div>
         <div className="space-y-1.5">
           {metrics.map((row, i) => (
@@ -391,7 +392,7 @@ export function RunFormDialog({ open, onOpenChange, experimentId, run }: {
             </div>
           ))}
         </div>
-        {e.metrics && <p className="mt-1 text-xs text-danger" role="alert">{e.metrics}</p>}
+        {e.metrics && <p className="mt-1 text-xs text-danger" role="alert">{t(e.metrics)}</p>}
       </div>
       <Field label="Config (JSON)" error={e.config} className="sm:col-span-2">{(id) => <Textarea id={id} value={v.config} onChange={set("config")} className="font-mono text-xs" rows={3} placeholder='{"lr": 0.0003, "num_envs": 4096}' />}</Field>
       <Field label="Artifact links" hint="One URL or path per line" className="sm:col-span-2">{(id) => <Textarea id={id} value={v.artifacts} onChange={set("artifacts")} rows={2} placeholder="https://wandb.ai/…" />}</Field>

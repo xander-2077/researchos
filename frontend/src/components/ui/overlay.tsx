@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
+import { t, tn } from "@/i18n";
 
 // ------------------------------------------------------------------ Dialog
 export function Dialog({ open, onOpenChange, title, description, children, footer, className, wide }: {
@@ -24,15 +25,15 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
         >
           <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-3.5">
             <div>
-              <DialogPrimitive.Title className="text-[15px] font-semibold">{title}</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="text-[15px] font-semibold">{tn(title)}</DialogPrimitive.Title>
               {description ? (
-                <DialogPrimitive.Description className="mt-0.5 text-xs text-muted-foreground">{description}</DialogPrimitive.Description>
+                <DialogPrimitive.Description className="mt-0.5 text-xs text-muted-foreground">{tn(description)}</DialogPrimitive.Description>
               ) : (
                 <DialogPrimitive.Description className="sr-only">{typeof title === "string" ? title : "Dialog"}</DialogPrimitive.Description>
               )}
             </div>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="Close">
+              <Button variant="ghost" size="icon-sm" aria-label={t("Close")}>
                 <X />
               </Button>
             </DialogPrimitive.Close>
@@ -56,14 +57,14 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
       title={title}
       footer={
         <>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
           <Button variant={destructive ? "destructive" : "default"} onClick={onConfirm} disabled={busy}>
-            {confirmLabel}
+            {t(confirmLabel)}
           </Button>
         </>
       }
     >
-      <div className="text-sm text-muted-foreground">{description}</div>
+      <div className="text-sm text-muted-foreground">{tn(description)}</div>
     </Dialog>
   );
 }

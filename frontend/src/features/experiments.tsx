@@ -10,6 +10,7 @@ import { useAppState } from "@/hooks/app-state";
 import { useExperiments } from "@/hooks/queries";
 import { formatNumber, label, relativeTime } from "@/lib/utils";
 import { EXPERIMENT_STATUSES, EXPERIMENT_TYPES, type Experiment } from "@/types/api";
+import { t } from "@/i18n";
 
 export function MetricStat({ m }: { m: { mean: number; std: number; n: number; unit: string } | undefined }) {
   if (!m) return <span className="text-muted-foreground">—</span>;
@@ -26,23 +27,23 @@ function ExperimentGroupTable({ items, metricCols, showProject }: { items: Exper
   const navigate = useNavigate();
   const cols = useMemo<ColumnDef<Experiment, unknown>[]>(() => {
     const c: ColumnDef<Experiment, unknown>[] = [
-      { accessorKey: "name", header: "Experiment", cell: ({ row }) => (
+      { accessorKey: "name", header: t("Experiment"), cell: ({ row }) => (
         <div className="min-w-0">
           <div className="truncate font-medium">{row.original.name}</div>
           <div className="truncate font-mono text-[11px] text-muted-foreground">{row.original.experiment_key}{row.original.variant && <span className="font-sans"> · {row.original.variant}</span>}</div>
         </div>
       ) },
     ];
-    if (showProject) c.push({ accessorKey: "project_title", header: "Project", cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground">{getValue() as string}</span> });
+    if (showProject) c.push({ accessorKey: "project_title", header: t("Project"), cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground">{getValue() as string}</span> });
     c.push(
-      { accessorKey: "type", header: "Type", cell: ({ getValue }) => <span className="text-muted-foreground">{label(getValue() as string)}</span> },
-      { accessorKey: "status", header: "Status", cell: ({ getValue }) => <Badge value={getValue() as string} /> },
-      { accessorKey: "run_count", header: "Runs", cell: ({ row }) => <span className="whitespace-nowrap tabular-nums">{row.original.run_count}{row.original.runs_needing_review > 0 && <span className="ml-1 text-[11px] text-warning">({row.original.runs_needing_review} to review)</span>}</span> },
+      { accessorKey: "type", header: t("Type"), cell: ({ getValue }) => <span className="text-muted-foreground">{label(getValue() as string)}</span> },
+      { accessorKey: "status", header: t("Status"), cell: ({ getValue }) => <Badge value={getValue() as string} /> },
+      { accessorKey: "run_count", header: t("Runs"), cell: ({ row }) => <span className="whitespace-nowrap tabular-nums">{row.original.run_count}{row.original.runs_needing_review > 0 && <span className="ml-1 text-[11px] text-warning">{t("({n} to review)", { n: row.original.runs_needing_review })}</span>}</span> },
       ...metricCols.map<ColumnDef<Experiment, unknown>>((mname) => ({
         id: `m:${mname}`, header: mname, accessorFn: (e) => e.metric_summary[mname]?.mean ?? Number.NEGATIVE_INFINITY,
         cell: ({ row }) => <MetricStat m={row.original.metric_summary[mname]} />,
       })),
-      { accessorKey: "updated_at", header: "Updated", cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground">{relativeTime(getValue() as string)}</span> },
+      { accessorKey: "updated_at", header: t("Updated"), cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground">{relativeTime(getValue() as string)}</span> },
     );
     return c;
   }, [metricCols, showProject]);
@@ -95,18 +96,18 @@ export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectI
         <Select aria-label="Metric" className="w-36" value={metric} onChange={(e) => setMetric(e.target.value)} placeholder="Any metric">
           {allMetrics.map((m) => <option key={m} value={m}>{m}</option>)}
         </Select>
-        <Input aria-label="Created after" type="date" className="w-36" value={after} onChange={(e) => setAfter(e.target.value)} title="Created after" />
-        <Input aria-label="Created before" type="date" className="w-36" value={before} onChange={(e) => setBefore(e.target.value)} title="Created before" />
+        <Input aria-label="Created after" type="date" className="w-36" value={after} onChange={(e) => setAfter(e.target.value)} title={t("Created after")} />
+        <Input aria-label="Created before" type="date" className="w-36" value={before} onChange={(e) => setBefore(e.target.value)} title={t("Created before")} />
         <Select aria-label="Sort experiments" className="w-40" value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="-updated_at">Recently updated</option>
-          <option value="-created_at">Newest</option>
-          <option value="name">Name</option>
-          <option value="status">Status</option>
-          <option value="group_name">Group</option>
+          <option value="-updated_at">{t("Recently updated")}</option>
+          <option value="-created_at">{t("Newest")}</option>
+          <option value="name">{t("Name")}</option>
+          <option value="status">{t("Status")}</option>
+          <option value="group_name">{t("Group")}</option>
         </Select>
         <div className="ml-auto flex items-center gap-2">
-          <Segmented ariaLabel="Grouping" value={grouped} onChange={setGrouped} options={[{ value: "group", label: "By group" }, { value: "flat", label: "Flat" }]} />
-          <Button onClick={() => openCreate({ kind: "experiment", projectId: projectId ?? undefined })}><Plus /> Experiment</Button>
+          <Segmented ariaLabel="Grouping" value={grouped} onChange={setGrouped} options={[{ value: "group", label: t("By group") }, { value: "flat", label: t("Flat") }]} />
+          <Button onClick={() => openCreate({ kind: "experiment", projectId: projectId ?? undefined })}><Plus /> {t("Experiment")}</Button>
         </div>
       </div>
       {query.isLoading ? (
@@ -116,7 +117,7 @@ export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectI
       ) : !items.length ? (
         <Card>
           <EmptyState icon={<FlaskConical className="size-4" />} title="No experiments" description="Experiments group runs (seeds, configs) under one condition. Agents can record them via MCP record_experiment."
-            action={<Button variant="secondary" onClick={() => openCreate({ kind: "experiment", projectId: projectId ?? undefined })}><Plus /> New experiment</Button>} />
+            action={<Button variant="secondary" onClick={() => openCreate({ kind: "experiment", projectId: projectId ?? undefined })}><Plus /> {t("New experiment")}</Button>} />
         </Card>
       ) : grouped === "flat" ? (
         <Card><ExperimentGroupTable items={items} metricCols={metricColsFor(items)} showProject={!projectId} /></Card>
@@ -124,8 +125,8 @@ export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectI
         groups.map(([g, list]) => (
           <Card key={g || "__none"}>
             <div className="flex items-center justify-between border-b border-border px-4 py-2">
-              <h3 className="text-[13px] font-semibold">{g || "Ungrouped"}</h3>
-              <span className="text-xs text-muted-foreground">{list.length} condition(s) · {list.reduce((a, e) => a + e.run_count, 0)} run(s)</span>
+              <h3 className="text-[13px] font-semibold">{g || t("Ungrouped")}</h3>
+              <span className="text-xs text-muted-foreground">{t("{n} condition(s) · {m} run(s)", { n: list.length, m: list.reduce((a, e) => a + e.run_count, 0) })}</span>
             </div>
             <ExperimentGroupTable items={list} metricCols={metricColsFor(list)} showProject={!projectId} />
           </Card>

@@ -153,3 +153,27 @@ describe("timeline", () => {
     expect(state.calls.some((c) => c.path === "/dashboard/deadlines")).toBe(true);
   });
 });
+
+describe("i18n", () => {
+  it("switches the UI to Simplified Chinese and remembers it", async () => {
+    state = installFakeApi({
+      authenticated: false,
+      projects: [makeProject({ id: 1, title: "Quadruped Soccer", stage: "analysis", health_status: "at_risk" })],
+    });
+    renderApp();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "简体中文" }));
+    expect(await screen.findByRole("button", { name: "登录" })).toBeInTheDocument();
+    expect(localStorage.getItem("researchos-lang")).toBe("zh");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    await user.type(screen.getByLabelText("密码"), "correct-horse-1");
+    await user.click(screen.getByRole("button", { name: "登录" }));
+    expect(await screen.findByText("进行中项目")).toBeInTheDocument();
+    const card = await screen.findByTestId("project-card");
+    expect(within(card).getByText("分析")).toBeInTheDocument(); // stage enum
+    expect(within(card).getByText("有风险")).toBeInTheDocument(); // health enum
+    expect(within(card).getByText("未设置")).toBeInTheDocument(); // no milestones
+    expect(screen.getByRole("link", { name: "项目" })).toBeInTheDocument(); // sidebar nav
+    // (kept last in this file: the language choice persists for the rest of the module)
+  });
+});

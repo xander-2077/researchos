@@ -17,6 +17,7 @@ import { api } from "@/services/api";
 import { cn, daysUntil, dueLabel, formatDate, formatDateTime, label, relativeTime } from "@/lib/utils";
 import { TASK_STATUSES, type ActivityEvent, type DeadlineItem, type Project, type Task, type TaskStatus } from "@/types/api";
 import { TaskFormDialog } from "./forms";
+import { t } from "@/i18n";
 
 export function Markdown({ children, className }: { children: string; className?: string }) {
   return (
@@ -44,7 +45,7 @@ export function PriorityIcon({ priority }: { priority: string }) {
   const bars = { critical: 4, high: 3, medium: 2, low: 1 }[priority] ?? 0;
   const color = { critical: "bg-danger", high: "bg-warning", medium: "bg-info", low: "bg-muted-foreground/50" }[priority] ?? "bg-muted";
   return (
-    <span className="inline-flex h-3 items-end gap-[2px]" title={`${label(priority)} priority`} aria-label={`${label(priority)} priority`}>
+    <span className="inline-flex h-3 items-end gap-[2px]" title={t("{p} priority", { p: label(priority) })} aria-label={t("{p} priority", { p: label(priority) })}>
       {[1, 2, 3, 4].map((i) => (
         <span key={i} className={cn("w-[3px] rounded-sm", i <= bars ? color : "bg-border")} style={{ height: `${i * 3}px` }} />
       ))}
@@ -75,15 +76,15 @@ export function ProjectCard({ p }: { p: Project }) {
       </div>
       <div>
         <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
-          <span>Milestones</span>
-          <span className="tabular-nums">{mp.total ? `${mp.completed}/${mp.total} · ${Math.round(mp.percent ?? 0)}%` : "Not set"}</span>
+          <span>{t("Milestones")}</span>
+          <span className="tabular-nums">{mp.total ? `${mp.completed}/${mp.total} · ${Math.round(mp.percent ?? 0)}%` : t("Not set")}</span>
         </div>
         <ProgressBar value={mp.percent} />
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
-        <dt className="text-muted-foreground">Next milestone</dt>
+        <dt className="text-muted-foreground">{t("Next milestone")}</dt>
         <dd className="truncate text-right">{p.next_milestone ? p.next_milestone.title : <span className="text-muted-foreground">—</span>}</dd>
-        <dt className="text-muted-foreground">Next deadline</dt>
+        <dt className="text-muted-foreground">{t("Next deadline")}</dt>
         <dd className="truncate text-right">
           {p.next_deadline ? (
             <span title={p.next_deadline.title}>
@@ -91,20 +92,20 @@ export function ProjectCard({ p }: { p: Project }) {
             </span>
           ) : <span className="text-muted-foreground">—</span>}
         </dd>
-        <dt className="text-muted-foreground">Open tasks</dt>
+        <dt className="text-muted-foreground">{t("Open tasks")}</dt>
         <dd className="text-right tabular-nums">{p.open_task_count}</dd>
-        <dt className="text-muted-foreground">Last activity</dt>
+        <dt className="text-muted-foreground">{t("Last activity")}</dt>
         <dd className="text-right">{relativeTime(p.last_activity_at)}</dd>
       </dl>
       {(p.blocker_summary || p.blocked_task_count > 0) && (
         <div className="flex items-start gap-1.5 rounded-md bg-danger/8 px-2 py-1.5 text-xs text-danger">
           <AlertOctagon className="mt-px size-3.5 shrink-0" />
-          <span className="line-clamp-2">{p.blocker_summary || `${p.blocked_task_count} blocked task(s): ${p.blocked_tasks.join(", ")}`}</span>
+          <span className="line-clamp-2">{p.blocker_summary || t("{n} blocked task(s): {list}", { n: p.blocked_task_count, list: p.blocked_tasks.join(", ") })}</span>
         </div>
       )}
       {p.next_action && !p.blocker_summary && (
         <p className="line-clamp-2 border-t border-border pt-2 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Next: </span>{p.next_action}
+          <span className="font-medium text-foreground">{t("Next:")} </span>{p.next_action}
         </p>
       )}
     </Link>
@@ -166,24 +167,24 @@ export function DataTable<T>({ data, columns, empty, onRowClick, rowClassName, i
 // ------------------------------------------------------------------ projects table
 export function ProjectTable({ projects }: { projects: Project[] }) {
   const cols = useMemo<ColumnDef<Project, unknown>[]>(() => [
-    { accessorKey: "title", header: "Project", cell: ({ row }) => (
+    { accessorKey: "title", header: t("Project"), cell: ({ row }) => (
       <Link to={`/projects/${row.original.slug}`} className="font-medium hover:text-primary">{row.original.title}</Link>
     ) },
-    { accessorKey: "stage", header: "Stage", cell: ({ getValue }) => <Badge value={getValue() as string} /> },
-    { accessorKey: "health_status", header: "Health", cell: ({ getValue }) => <Badge value={getValue() as string} dot /> },
-    { accessorKey: "priority", header: "Priority", sortingFn: (a, b) => prio(a.original.priority) - prio(b.original.priority),
+    { accessorKey: "stage", header: t("Stage"), cell: ({ getValue }) => <Badge value={getValue() as string} /> },
+    { accessorKey: "health_status", header: t("Health"), cell: ({ getValue }) => <Badge value={getValue() as string} dot /> },
+    { accessorKey: "priority", header: t("Priority"), sortingFn: (a, b) => prio(a.original.priority) - prio(b.original.priority),
       cell: ({ getValue }) => <span className="inline-flex items-center gap-1.5"><PriorityIcon priority={getValue() as string} />{label(getValue() as string)}</span> },
-    { id: "progress", header: "Milestones", accessorFn: (p) => p.milestone_progress.percent ?? -1, cell: ({ row }) => {
+    { id: "progress", header: t("Milestones"), accessorFn: (p) => p.milestone_progress.percent ?? -1, cell: ({ row }) => {
       const mp = row.original.milestone_progress;
-      return mp.total ? <div className="flex w-28 items-center gap-2"><ProgressBar value={mp.percent} /><span className="text-xs tabular-nums text-muted-foreground">{mp.completed}/{mp.total}</span></div> : <span className="text-xs text-muted-foreground">Not set</span>;
+      return mp.total ? <div className="flex w-28 items-center gap-2"><ProgressBar value={mp.percent} /><span className="text-xs tabular-nums text-muted-foreground">{mp.completed}/{mp.total}</span></div> : <span className="text-xs text-muted-foreground">{t("Not set")}</span>;
     } },
-    { id: "next_deadline", header: "Next deadline", accessorFn: (p) => p.next_deadline?.due_date ?? "9999", cell: ({ row }) => <DueDate date={row.original.next_deadline?.due_date ?? null} /> },
-    { accessorKey: "open_task_count", header: "Open", cell: ({ getValue }) => <span className="tabular-nums">{getValue() as number}</span> },
-    { id: "last", header: "Last activity", accessorFn: (p) => p.last_activity_at ?? "", cell: ({ row }) => <span className="text-muted-foreground">{relativeTime(row.original.last_activity_at)}</span> },
-    { id: "blockers", header: "Blockers", enableSorting: false, cell: ({ row }) => {
+    { id: "next_deadline", header: t("Next deadline"), accessorFn: (p) => p.next_deadline?.due_date ?? "9999", cell: ({ row }) => <DueDate date={row.original.next_deadline?.due_date ?? null} /> },
+    { accessorKey: "open_task_count", header: t("Open"), cell: ({ getValue }) => <span className="tabular-nums">{getValue() as number}</span> },
+    { id: "last", header: t("Last activity"), accessorFn: (p) => p.last_activity_at ?? "", cell: ({ row }) => <span className="text-muted-foreground">{relativeTime(row.original.last_activity_at)}</span> },
+    { id: "blockers", header: t("Blockers"), enableSorting: false, cell: ({ row }) => {
       const p = row.original;
-      const t = p.blocker_summary || (p.blocked_task_count ? `${p.blocked_task_count} blocked task(s)` : "");
-      return t ? <span className="line-clamp-1 max-w-56 text-xs text-danger" title={t}>{t}</span> : <span className="text-muted-foreground">—</span>;
+      const b = p.blocker_summary || (p.blocked_task_count ? t("{n} blocked task(s)", { n: p.blocked_task_count }) : "");
+      return b ? <span className="line-clamp-1 max-w-56 text-xs text-danger" title={b}>{b}</span> : <span className="text-muted-foreground">—</span>;
     } },
   ], []);
   return <DataTable data={projects} columns={cols} />;
@@ -193,7 +194,7 @@ const prio = (p: string) => ({ critical: 0, high: 1, medium: 2, low: 3 })[p] ?? 
 
 // ------------------------------------------------------------------ task status quick change + row actions
 export function TaskStatusSelect({ task }: { task: Task }) {
-  const m = useWrite((s: TaskStatus) => api.updateTask(task.id, { status: s }), { success: (_r, s) => `Task → ${label(s)}` });
+  const m = useWrite((s: TaskStatus) => api.updateTask(task.id, { status: s }), { success: (_r, s) => t("Task → {s}", { s: label(s) }) });
   return (
     <select
       aria-label={`Status of ${task.title}`}
@@ -218,13 +219,13 @@ export function TaskActions({ task }: { task: Task }) {
           <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${task.title}`}><MoreHorizontal /></Button>
         </DropdownTrigger>
         <DropdownContent>
-          <DropdownItem onSelect={() => setEdit(true)}><Pencil /> Edit</DropdownItem>
+          <DropdownItem onSelect={() => setEdit(true)}><Pencil /> {t("Edit")}</DropdownItem>
           <DropdownSeparator />
-          <DropdownItem onSelect={() => setConfirm(true)} className="text-danger"><Trash2 className="!text-danger" /> Delete</DropdownItem>
+          <DropdownItem onSelect={() => setConfirm(true)} className="text-danger"><Trash2 className="!text-danger" /> {t("Delete")}</DropdownItem>
         </DropdownContent>
       </DropdownMenu>
       <TaskFormDialog open={edit} onOpenChange={setEdit} task={task} />
-      <ConfirmDialog open={confirm} onOpenChange={setConfirm} title="Delete task?" description={`“${task.title}” will be removed. This is recorded in the activity log.`} confirmLabel="Delete" destructive onConfirm={() => del.mutate(undefined)} busy={del.isPending} />
+      <ConfirmDialog open={confirm} onOpenChange={setConfirm} title="Delete task?" description={t("“{title}” will be removed. This is recorded in the activity log.", { title: task.title })} confirmLabel="Delete" destructive onConfirm={() => del.mutate(undefined)} busy={del.isPending} />
     </div>
   );
 }
@@ -233,8 +234,8 @@ export function TaskTable({ tasks, showProject = true, empty }: { tasks: Task[];
   const [editing, setEditing] = useState<Task | null>(null);
   const cols = useMemo<ColumnDef<Task, unknown>[]>(() => {
     const c: ColumnDef<Task, unknown>[] = [
-      { accessorKey: "priority", header: "P", size: 40, sortingFn: (a, b) => prio(a.original.priority) - prio(b.original.priority), cell: ({ row }) => <PriorityIcon priority={row.original.priority} /> },
-      { accessorKey: "title", header: "Task", cell: ({ row }) => (
+      { accessorKey: "priority", header: t("P"), size: 40, sortingFn: (a, b) => prio(a.original.priority) - prio(b.original.priority), cell: ({ row }) => <PriorityIcon priority={row.original.priority} /> },
+      { accessorKey: "title", header: t("Task"), cell: ({ row }) => (
         <div className="min-w-0">
           <div className={cn("truncate font-medium", row.original.status === "done" && "text-muted-foreground line-through")}>{row.original.title}</div>
           {(row.original.tags.length > 0 || row.original.milestone_title || row.original.git_reference) && (
@@ -247,10 +248,10 @@ export function TaskTable({ tasks, showProject = true, empty }: { tasks: Task[];
         </div>
       ) },
     ];
-    if (showProject) c.push({ accessorKey: "project_title", header: "Project", cell: ({ row }) => <Link onClick={(e) => e.stopPropagation()} to={`/projects/${row.original.project_slug}`} className="whitespace-nowrap text-muted-foreground hover:text-foreground">{row.original.project_title}</Link> });
+    if (showProject) c.push({ accessorKey: "project_title", header: t("Project"), cell: ({ row }) => <Link onClick={(e) => e.stopPropagation()} to={`/projects/${row.original.project_slug}`} className="whitespace-nowrap text-muted-foreground hover:text-foreground">{row.original.project_title}</Link> });
     c.push(
-      { accessorKey: "status", header: "Status", cell: ({ row }) => <TaskStatusSelect task={row.original} /> },
-      { accessorKey: "due_date", header: "Deadline", sortingFn: (a, b) => (a.original.due_date ?? "9999").localeCompare(b.original.due_date ?? "9999"), cell: ({ row }) => <DueDate date={row.original.due_date} done={row.original.status === "done" || row.original.status === "cancelled"} /> },
+      { accessorKey: "status", header: t("Status"), cell: ({ row }) => <TaskStatusSelect task={row.original} /> },
+      { accessorKey: "due_date", header: t("Deadline"), sortingFn: (a, b) => (a.original.due_date ?? "9999").localeCompare(b.original.due_date ?? "9999"), cell: ({ row }) => <DueDate date={row.original.due_date} done={row.original.status === "done" || row.original.status === "cancelled"} /> },
       { id: "actions", header: "", size: 40, enableSorting: false, cell: ({ row }) => <TaskActions task={row.original} /> },
     );
     return c;
@@ -275,7 +276,7 @@ const KANBAN_COLS: TaskStatus[] = ["todo", "in_progress", "blocked", "done"];
 export function TaskKanban({ tasks, showProject = true, onAdd }: { tasks: Task[]; showProject?: boolean; onAdd?: (s: TaskStatus) => void }) {
   const [editing, setEditing] = useState<Task | null>(null);
   const [dragId, setDragId] = useState<number | null>(null);
-  const move = useWrite((v: { id: number; status: TaskStatus }) => api.updateTask(v.id, { status: v.status }), { success: (_r, v) => `Moved to ${label(v.status)}` });
+  const move = useWrite((v: { id: number; status: TaskStatus }) => api.updateTask(v.id, { status: v.status }), { success: (_r, v) => t("Moved to {s}", { s: label(v.status) }) });
   return (
     <>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -363,7 +364,7 @@ export function ActivityList({ events, showProject = true, compact }: { events: 
               {showProject && e.project_slug && <Link to={`/projects/${e.project_slug}`} className="hover:text-foreground">{e.project_title}</Link>}
               <SourceBadge source={e.source} actor={e.actor} />
               {!compact && <span className="rounded bg-muted px-1">{label(e.event_type)}</span>}
-              {e.details && <button type="button" className="cursor-pointer text-primary hover:underline" onClick={() => setOpen(open === e.id ? null : e.id)}>{open === e.id ? "Hide details" : "Details"}</button>}
+              {e.details && <button type="button" className="cursor-pointer text-primary hover:underline" onClick={() => setOpen(open === e.id ? null : e.id)}>{open === e.id ? t("Hide details") : t("Details")}</button>}
             </div>
             {open === e.id && e.details && <div className="mt-2 rounded-md border border-border bg-muted/40 p-3"><Markdown>{e.details}</Markdown></div>}
           </div>

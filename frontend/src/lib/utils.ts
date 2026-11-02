@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { locale, t } from "@/i18n";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,9 +25,19 @@ export const LABELS: Record<string, string> = {
   manual: "Manual", claude_code: "Claude Code", codex: "Codex", rest_api: "REST API", mcp: "MCP agent", system: "System",
   // deadline kinds
   milestone: "Milestone", task: "Task", archived: "Archived",
+  // activity event types
+  progress_note: "Progress note", project_created: "Project created", stage_changed: "Stage changed",
+  health_changed: "Health changed", project_updated: "Project updated", project_archived: "Project archived",
+  project_restored: "Project restored", task_created: "Task created", task_completed: "Task completed",
+  task_updated: "Task updated", task_status_changed: "Task status changed", task_deleted: "Task deleted",
+  milestone_created: "Milestone created", milestone_completed: "Milestone completed", milestone_updated: "Milestone updated",
+  milestone_status_changed: "Milestone status changed", milestone_deleted: "Milestone deleted",
+  experiment_created: "Experiment created", experiment_updated: "Experiment updated",
+  experiment_status_changed: "Experiment status changed", experiment_deleted: "Experiment deleted",
+  run_recorded: "Run recorded", run_updated: "Run updated", run_verified: "Run verified", run_deleted: "Run deleted",
 };
 
-export const label = (v: string | null | undefined) => (v ? LABELS[v] ?? v.replace(/_/g, " ") : "—");
+export const label = (v: string | null | undefined) => (v ? t(LABELS[v] ?? v.replace(/_/g, " ")) : "—");
 
 type Tone = "neutral" | "blue" | "green" | "amber" | "red" | "violet" | "slate";
 
@@ -81,14 +92,14 @@ export function formatDate(s: string | null | undefined, opts: { withYear?: bool
   if (!s) return "—";
   const d = parseDate(s);
   const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(locale(), {
     month: "short", day: "numeric", ...(opts.withYear || !sameYear ? { year: "numeric" } : {}),
   });
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, {
+  return new Date(iso).toLocaleString(locale(), {
     year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }
@@ -96,9 +107,9 @@ export function formatDateTime(iso: string | null | undefined): string {
 export function relativeTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat(locale(), { numeric: "auto" });
   const abs = Math.abs(diff);
-  if (abs < 60) return "just now";
+  if (abs < 60) return t("just now");
   if (abs < 3600) return rtf.format(-Math.round(diff / 60), "minute");
   if (abs < 86400) return rtf.format(-Math.round(diff / 3600), "hour");
   if (abs < 86400 * 30) return rtf.format(-Math.round(diff / 86400), "day");
@@ -108,10 +119,10 @@ export function relativeTime(iso: string | null | undefined): string {
 export function dueLabel(s: string | null | undefined): string {
   const n = daysUntil(s);
   if (n === null) return "";
-  if (n === 0) return "today";
-  if (n === 1) return "tomorrow";
-  if (n === -1) return "yesterday";
-  return n < 0 ? `${-n}d overdue` : `in ${n}d`;
+  if (n === 0) return t("today");
+  if (n === 1) return t("tomorrow");
+  if (n === -1) return t("yesterday");
+  return n < 0 ? t("{n}d overdue", { n: -n }) : t("in {n}d", { n });
 }
 
 export function formatNumber(v: number | null | undefined, digits = 3): string {

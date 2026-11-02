@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity, CalendarRange, ChevronsLeft, ChevronsRight, FlaskConical, FolderKanban, LayoutDashboard, ListTodo,
-  LogOut, Menu, Monitor, Moon, NotebookPen, Plus, Search, Settings, Sun, X,
+  Languages, LogOut, Menu, Monitor, Moon, NotebookPen, Plus, Search, Settings, Sun, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form";
@@ -15,6 +15,7 @@ import { useProjects } from "@/hooks/queries";
 import { api } from "@/services/api";
 import { cn, label } from "@/lib/utils";
 import { CreateDialogHost } from "@/features/CreateDialogHost";
+import { LANGS, t, useI18n } from "@/i18n";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
@@ -58,7 +59,7 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
               to={to}
               end={end}
               onClick={onClose}
-              title={collapsed ? l : undefined}
+              title={collapsed ? t(l) : undefined}
               className={({ isActive }) =>
                 cn(
                   "flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
@@ -68,15 +69,15 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
               }
             >
               <Icon className="size-4 shrink-0" />
-              <span className={cn(collapsed && "md:hidden")}>{l}</span>
+              <span className={cn(collapsed && "md:hidden")}>{t(l)}</span>
             </NavLink>
           ))}
         </nav>
         <div className="border-t border-border p-2">
           <div className={cn("flex items-center gap-2 px-1", collapsed && "md:flex-col")}>
             <span className={cn("flex-1 truncate text-xs text-muted-foreground", collapsed && "md:hidden")}>{me?.username}</span>
-            <Button variant="ghost" size="icon-sm" onClick={() => void logout()} aria-label="Log out" title="Log out"><LogOut /></Button>
-            <Button variant="ghost" size="icon-sm" className="hidden md:inline-flex" onClick={toggleSidebar} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            <Button variant="ghost" size="icon-sm" onClick={() => void logout()} aria-label={t("Log out")} title={t("Log out")}><LogOut /></Button>
+            <Button variant="ghost" size="icon-sm" className="hidden md:inline-flex" onClick={toggleSidebar} aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}>
               {collapsed ? <ChevronsRight /> : <ChevronsLeft />}
             </Button>
           </div>
@@ -132,7 +133,7 @@ function GlobalSearch() {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), setOpen(false))}
-        placeholder="Search projects, tasks, experiments…"
+        placeholder={t("Search projects, tasks, experiments…")}
         aria-label="Global search"
         className="h-8 w-full rounded-md border border-input bg-card pl-8 pr-12 text-[13px] placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
       />
@@ -140,10 +141,10 @@ function GlobalSearch() {
       {open && enabled && (
         <div className="absolute left-0 right-0 top-10 z-50 max-h-96 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg sm:right-auto sm:w-[26rem]">
           {results.isLoading && <div className="flex justify-center p-4"><Spinner /></div>}
-          {empty && <p className="p-3 text-center text-xs text-muted-foreground">No results for “{term}”</p>}
-          {r?.projects.length ? <SearchGroup title="Projects">{r.projects.map((p) => <SearchItem key={p.id} onSelect={() => go(`/projects/${p.slug}`)} title={p.title} meta={label(p.stage)} />)}</SearchGroup> : null}
-          {r?.tasks.length ? <SearchGroup title="Tasks">{r.tasks.map((t) => <SearchItem key={t.id} onSelect={() => go(`/projects/${t.project_slug}?tab=tasks`)} title={t.title} meta={`${t.project_title} · ${label(t.status)}`} />)}</SearchGroup> : null}
-          {r?.experiments.length ? <SearchGroup title="Experiments">{r.experiments.map((e) => <SearchItem key={e.id} onSelect={() => go(`/experiments/${e.id}`)} title={e.name} meta={`${e.project_title} · ${label(e.status)}`} />)}</SearchGroup> : null}
+          {empty && <p className="p-3 text-center text-xs text-muted-foreground">{t("No results for “{term}”", { term })}</p>}
+          {r?.projects.length ? <SearchGroup title={t("Projects")}>{r.projects.map((p) => <SearchItem key={p.id} onSelect={() => go(`/projects/${p.slug}`)} title={p.title} meta={label(p.stage)} />)}</SearchGroup> : null}
+          {r?.tasks.length ? <SearchGroup title={t("Tasks")}>{r.tasks.map((t) => <SearchItem key={t.id} onSelect={() => go(`/projects/${t.project_slug}?tab=tasks`)} title={t.title} meta={`${t.project_title} · ${label(t.status)}`} />)}</SearchGroup> : null}
+          {r?.experiments.length ? <SearchGroup title={t("Experiments")}>{r.experiments.map((e) => <SearchItem key={e.id} onSelect={() => go(`/experiments/${e.id}`)} title={e.name} meta={`${e.project_title} · ${label(e.status)}`} />)}</SearchGroup> : null}
         </div>
       )}
     </div>
@@ -165,13 +166,31 @@ function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Theme"><Icon /></Button>
+        <Button variant="ghost" size="icon" aria-label={t("Theme")} title={t("Theme")}><Icon /></Button>
       </DropdownTrigger>
       <DropdownContent className="min-w-32">
-        {(["light", "dark", "system"] as Theme[]).map((t) => (
-          <DropdownItem key={t} onSelect={() => setTheme(t)} className={cn(theme === t && "font-semibold")}>
-            {t === "light" ? <Sun /> : t === "dark" ? <Moon /> : <Monitor />}
-            {t[0].toUpperCase() + t.slice(1)}
+        {(["light", "dark", "system"] as Theme[]).map((th) => (
+          <DropdownItem key={th} onSelect={() => setTheme(th)} className={cn(theme === th && "font-semibold")}>
+            {th === "light" ? <Sun /> : th === "dark" ? <Moon /> : <Monitor />}
+            {t(th[0].toUpperCase() + th.slice(1))}
+          </DropdownItem>
+        ))}
+      </DropdownContent>
+    </DropdownMenu>
+  );
+}
+
+function LanguageToggle() {
+  const { lang, setLang } = useI18n();
+  return (
+    <DropdownMenu>
+      <DropdownTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={t("Language")} title={t("Language")}><Languages /></Button>
+      </DropdownTrigger>
+      <DropdownContent className="min-w-32">
+        {LANGS.map((l) => (
+          <DropdownItem key={l.value} onSelect={() => setLang(l.value)} className={cn(lang === l.value && "font-semibold")}>
+            {l.label}
           </DropdownItem>
         ))}
       </DropdownContent>
@@ -201,15 +220,15 @@ function NewMenu() {
   return (
     <DropdownMenu>
       <DropdownTrigger asChild>
-        <Button size="default" aria-label="New"><Plus /> <span className="hidden sm:inline">New</span></Button>
+        <Button size="default" aria-label={t("New")}><Plus /> <span className="hidden sm:inline">{t("New")}</span></Button>
       </DropdownTrigger>
       <DropdownContent>
-        <DropdownLabel>Create</DropdownLabel>
-        <DropdownItem onSelect={() => openCreate({ kind: "project" })}><FolderKanban /> Project</DropdownItem>
-        <DropdownItem onSelect={() => openCreate({ kind: "task", projectId: pid })}><ListTodo /> Task</DropdownItem>
-        <DropdownItem onSelect={() => openCreate({ kind: "experiment", projectId: pid })}><FlaskConical /> Experiment</DropdownItem>
+        <DropdownLabel>{t("Create")}</DropdownLabel>
+        <DropdownItem onSelect={() => openCreate({ kind: "project" })}><FolderKanban /> {t("Project")}</DropdownItem>
+        <DropdownItem onSelect={() => openCreate({ kind: "task", projectId: pid })}><ListTodo /> {t("Task")}</DropdownItem>
+        <DropdownItem onSelect={() => openCreate({ kind: "experiment", projectId: pid })}><FlaskConical /> {t("Experiment")}</DropdownItem>
         <DropdownSeparator />
-        <DropdownItem onSelect={() => openCreate({ kind: "progress", projectId: pid })}><NotebookPen /> Progress note</DropdownItem>
+        <DropdownItem onSelect={() => openCreate({ kind: "progress", projectId: pid })}><NotebookPen /> {t("Progress note")}</DropdownItem>
       </DropdownContent>
     </DropdownMenu>
   );
@@ -219,7 +238,7 @@ export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const loc = useLocation();
   const section = loc.pathname.split("/")[1] ?? "";
-  const title = TITLES[section] ?? "ResearchOS";
+  const title = TITLES[section] ? t(TITLES[section]) : "ResearchOS";
   useEffect(() => {
     document.title = `${title} · ResearchOS`;
   }, [title]);
@@ -236,6 +255,7 @@ export function AppLayout() {
           <div className="flex flex-1 justify-center px-2"><GlobalSearch /></div>
           {showProjectFilter && <ProjectFilter />}
           <NewMenu />
+          <LanguageToggle />
           <ThemeToggle />
         </header>
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-3 py-5 md:px-6">

@@ -13,6 +13,7 @@ import { useExperiment, useWrite } from "@/hooks/queries";
 import { api } from "@/services/api";
 import { formatDateTime, formatNumber, label, relativeTime, shortSha } from "@/lib/utils";
 import type { Run } from "@/types/api";
+import { t } from "@/i18n";
 
 export default function ExperimentsPage() {
   const { projectFilter } = useAppState();
@@ -22,22 +23,22 @@ export default function ExperimentsPage() {
 
 function RunActions({ run, onEdit }: { run: Run; onEdit: () => void }) {
   const [confirm, setConfirm] = useState(false);
-  const verify = useWrite((s: string) => api.updateRun(run.id, { verification_status: s }), { success: (_r, s) => `Run marked ${label(s)}` });
+  const verify = useWrite((s: string) => api.updateRun(run.id, { verification_status: s }), { success: (_r, s) => t("Run marked {s}", { s: label(s) }) });
   const del = useWrite(() => api.deleteRun(run.id), { success: "Run deleted", onSuccess: () => setConfirm(false) });
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`Actions for run ${run.external_run_id}`}><MoreHorizontal /></Button></DropdownTrigger>
         <DropdownContent>
-          <DropdownItem onSelect={onEdit}><Pencil /> Edit</DropdownItem>
-          {run.verification_status !== "verified" && <DropdownItem onSelect={() => verify.mutate("verified")}><ShieldCheck /> Mark verified</DropdownItem>}
-          {run.verification_status !== "rejected" && <DropdownItem onSelect={() => verify.mutate("rejected")}>Reject</DropdownItem>}
-          {run.verification_status !== "needs_review" && <DropdownItem onSelect={() => verify.mutate("needs_review")}>Back to review</DropdownItem>}
+          <DropdownItem onSelect={onEdit}><Pencil /> {t("Edit")}</DropdownItem>
+          {run.verification_status !== "verified" && <DropdownItem onSelect={() => verify.mutate("verified")}><ShieldCheck /> {t("Mark verified")}</DropdownItem>}
+          {run.verification_status !== "rejected" && <DropdownItem onSelect={() => verify.mutate("rejected")}>{t("Reject")}</DropdownItem>}
+          {run.verification_status !== "needs_review" && <DropdownItem onSelect={() => verify.mutate("needs_review")}>{t("Back to review")}</DropdownItem>}
           <DropdownSeparator />
-          <DropdownItem className="text-danger" onSelect={() => setConfirm(true)}><Trash2 className="!text-danger" /> Delete</DropdownItem>
+          <DropdownItem className="text-danger" onSelect={() => setConfirm(true)}><Trash2 className="!text-danger" /> {t("Delete")}</DropdownItem>
         </DropdownContent>
       </DropdownMenu>
-      <ConfirmDialog open={confirm} onOpenChange={setConfirm} title="Delete run?" description={`Run ${run.external_run_id} and its metrics will be removed.`} confirmLabel="Delete" destructive onConfirm={() => del.mutate(undefined)} busy={del.isPending} />
+      <ConfirmDialog open={confirm} onOpenChange={setConfirm} title="Delete run?" description={t("Run {id} and its metrics will be removed.", { id: run.external_run_id })} confirmLabel="Delete" destructive onConfirm={() => del.mutate(undefined)} busy={del.isPending} />
     </div>
   );
 }
@@ -60,9 +61,9 @@ export function ExperimentDetailPage() {
   const metricNames = e.metric_names;
 
   const cols: ColumnDef<Run, unknown>[] = [
-    { accessorKey: "external_run_id", header: "Run", cell: ({ row }) => <span className="font-mono text-xs">{row.original.external_run_id}</span> },
-    { accessorKey: "seed", header: "Seed", cell: ({ getValue }) => <span className="tabular-nums">{(getValue() as number | null) ?? "—"}</span> },
-    { accessorKey: "git_commit", header: "Commit", cell: ({ row }) => row.original.git_commit ? <span className="font-mono text-xs" title={`${row.original.git_commit} (${row.original.git_branch || "?"})`}>{shortSha(row.original.git_commit)}</span> : <span className="text-muted-foreground">—</span> },
+    { accessorKey: "external_run_id", header: t("Run"), cell: ({ row }) => <span className="font-mono text-xs">{row.original.external_run_id}</span> },
+    { accessorKey: "seed", header: t("Seed"), cell: ({ getValue }) => <span className="tabular-nums">{(getValue() as number | null) ?? "—"}</span> },
+    { accessorKey: "git_commit", header: t("Commit"), cell: ({ row }) => row.original.git_commit ? <span className="font-mono text-xs" title={`${row.original.git_commit} (${row.original.git_branch || "?"})`}>{shortSha(row.original.git_commit)}</span> : <span className="text-muted-foreground">—</span> },
     ...metricNames.map<ColumnDef<Run, unknown>>((m) => ({
       id: `m:${m}`, header: m, accessorFn: (r) => r.metrics_json[m]?.value ?? Number.NEGATIVE_INFINITY,
       cell: ({ row }) => {
@@ -70,14 +71,14 @@ export function ExperimentDetailPage() {
         return v ? <span className="tabular-nums" title={v.description}>{formatNumber(v.value)}{v.unit && <span className="ml-0.5 text-[11px] text-muted-foreground">{v.unit}</span>}</span> : <span className="text-muted-foreground">—</span>;
       },
     })),
-    { accessorKey: "status", header: "Status", cell: ({ getValue }) => <span className="text-muted-foreground">{label(getValue() as string)}</span> },
-    { accessorKey: "verification_status", header: "Verification", cell: ({ getValue }) => <Badge value={getValue() as string} /> },
-    { id: "links", header: "Artifacts", enableSorting: false, cell: ({ row }) => (
+    { accessorKey: "status", header: t("Status"), cell: ({ getValue }) => <span className="text-muted-foreground">{label(getValue() as string)}</span> },
+    { accessorKey: "verification_status", header: t("Verification"), cell: ({ getValue }) => <Badge value={getValue() as string} /> },
+    { id: "links", header: t("Artifacts"), enableSorting: false, cell: ({ row }) => (
       <div className="flex gap-1">{row.original.artifact_links.slice(0, 3).map((l, i) => (
         <a key={i} href={l.url} target="_blank" rel="noreferrer noopener" onClick={(ev) => ev.stopPropagation()} className="text-primary" title={l.url}><ExternalLink className="size-3.5" /></a>
       ))}{!row.original.artifact_links.length && <span className="text-muted-foreground">—</span>}</div>
     ) },
-    { accessorKey: "updated_at", header: "Updated", cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground">{relativeTime(getValue() as string)}</span> },
+    { accessorKey: "updated_at", header: t("Updated"), cell: ({ getValue }) => <span className="whitespace-nowrap text-muted-foreground">{relativeTime(getValue() as string)}</span> },
     { id: "actions", header: "", enableSorting: false, cell: ({ row }) => <RunActions run={row.original} onEdit={() => setRunDialog({ open: true, run: row.original })} /> },
   ];
 
@@ -91,13 +92,13 @@ export function ExperimentDetailPage() {
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <Badge value={e.status} />
               <Badge value={e.type} />
-              {e.group_name && <span>Group: <span className="text-foreground">{e.group_name}</span></span>}
+              {e.group_name && <span>{t("Group:")} <span className="text-foreground">{e.group_name}</span></span>}
               <span className="font-mono">· {e.experiment_key}</span>
             </div>
           </div>
           <div className="flex gap-2">
-            {e.status !== "verified" && <Button variant="secondary" onClick={() => setConfirmVerify(true)}><CheckCircle2 /> Mark verified</Button>}
-            <Button variant="secondary" onClick={() => setEdit(true)}><Pencil /> Edit</Button>
+            {e.status !== "verified" && <Button variant="secondary" onClick={() => setConfirmVerify(true)}><CheckCircle2 /> {t("Mark verified")}</Button>}
+            <Button variant="secondary" onClick={() => setEdit(true)}><Pencil /> {t("Edit")}</Button>
             <Button variant="ghost" size="icon" aria-label="Delete experiment" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
           </div>
         </div>
@@ -108,10 +109,10 @@ export function ExperimentDetailPage() {
           <CardHeader title="Design" />
           <dl className="grid grid-cols-1 gap-x-6 gap-y-3 p-4 text-[13px] sm:grid-cols-2">
             {[["Hypothesis", e.hypothesis], ["Baseline", e.baseline], ["Variant", e.variant], ["Description", e.description]].map(([k, v]) => (
-              <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="mt-0.5 whitespace-pre-wrap">{v || <span className="text-muted-foreground">—</span>}</dd></div>
+              <div key={k}><dt className="text-xs text-muted-foreground">{t(k)}</dt><dd className="mt-0.5 whitespace-pre-wrap">{v || <span className="text-muted-foreground">—</span>}</dd></div>
             ))}
-            <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Conclusion</dt><dd className="mt-0.5 whitespace-pre-wrap">{e.conclusion || <span className="text-muted-foreground">No conclusion recorded yet.</span>}</dd></div>
-            <div className="text-xs text-muted-foreground sm:col-span-2">Created {formatDateTime(e.created_at)} · Updated {formatDateTime(e.updated_at)}</div>
+            <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">{t("Conclusion")}</dt><dd className="mt-0.5 whitespace-pre-wrap">{e.conclusion || <span className="text-muted-foreground">{t("No conclusion recorded yet.")}</span>}</dd></div>
+            <div className="text-xs text-muted-foreground sm:col-span-2">{t("Created {a} · Updated {b}", { a: formatDateTime(e.created_at), b: formatDateTime(e.updated_at) })}</div>
           </dl>
         </Card>
         <Card>
@@ -136,7 +137,7 @@ export function ExperimentDetailPage() {
       </div>
 
       <Card>
-        <CardHeader title={`Runs (${runs.length})`} action={<Button size="sm" onClick={() => setRunDialog({ open: true })}><Plus /> Add run</Button>} />
+        <CardHeader title={t("Runs ({n})", { n: runs.length })} action={<Button size="sm" onClick={() => setRunDialog({ open: true })}><Plus /> {t("Add run")}</Button>} />
         <DataTable data={runs} columns={cols} onRowClick={(r) => setRunDialog({ open: true, run: r })}
           empty={<EmptyState title="No runs recorded" description="A run is one execution (seed/config). Re-using a run ID updates it instead of duplicating." />} />
       </Card>
@@ -146,7 +147,7 @@ export function ExperimentDetailPage() {
       <ConfirmDialog open={confirmVerify} onOpenChange={setConfirmVerify} title="Mark experiment as verified?" confirmLabel="Mark verified" onConfirm={() => verify.mutate(undefined)} busy={verify.isPending}
         description="Verified means you have checked the evidence (runs, seeds, metrics) and stand behind the conclusion. Agents cannot change verified results without explicit confirmation." />
       <ConfirmDialog open={confirmDelete} onOpenChange={setConfirmDelete} title="Delete experiment?" destructive confirmLabel="Delete" onConfirm={() => del.mutate(undefined)} busy={del.isPending}
-        description={`“${e.name}” and all ${runs.length} run(s) will be permanently removed.`} />
+        description={t("“{name}” and all {n} run(s) will be permanently removed.", { name: e.name, n: runs.length })} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { ActivityList } from "@/features/common";
 import { useAppState } from "@/hooks/app-state";
 import { useActivity } from "@/hooks/queries";
 import { SOURCES } from "@/types/api";
+import { t } from "@/i18n";
 
 const EVENT_TYPES = [
   "progress_note", "project_created", "stage_changed", "health_changed", "task_created", "task_completed",
@@ -35,8 +36,8 @@ export default function ActivityPage() {
         </div>
         <Select aria-label="Source" className="w-36" value={source} onChange={(e) => setSource(e.target.value)} options={SOURCES} placeholder="All sources" />
         <Select aria-label="Event type" className="w-44" value={eventType} onChange={(e) => setEventType(e.target.value)} options={EVENT_TYPES} placeholder="All events" />
-        <Input aria-label="Since" type="date" className="w-36" value={since} onChange={(e) => setSince(e.target.value)} title="From" />
-        <Input aria-label="Until" type="date" className="w-36" value={until} onChange={(e) => setUntil(e.target.value)} title="To" />
+        <Input aria-label="Since" type="date" className="w-36" value={since} onChange={(e) => setSince(e.target.value)} title={t("Since")} />
+        <Input aria-label="Until" type="date" className="w-36" value={until} onChange={(e) => setUntil(e.target.value)} title={t("Until")} />
       </div>
       <Card className="p-4">
         {query.isLoading ? <div className="space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10" />)}</div>
@@ -46,7 +47,7 @@ export default function ActivityPage() {
               <ActivityList events={query.data.items} />
               {query.data.total > query.data.items.length && (
                 <Button variant="secondary" size="sm" className="mt-3" onClick={() => setLimit((l) => Math.min(l + 50, 200))} disabled={limit >= 200}>
-                  {limit >= 200 ? "Narrow filters to see older events" : `Load more (${query.data.total - query.data.items.length})`}
+                  {limit >= 200 ? t("Narrow filters to see older events") : t("Load more ({n})", { n: query.data.total - query.data.items.length })}
                 </Button>
               )}
             </>

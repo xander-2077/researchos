@@ -8,6 +8,7 @@ import { useAppState } from "@/hooks/app-state";
 import { useTasks } from "@/hooks/queries";
 import { cn, todayISO } from "@/lib/utils";
 import { PRIORITIES, TASK_STATUSES } from "@/types/api";
+import { t } from "@/i18n";
 
 type Preset = "open" | "blocked" | "week" | "overdue" | "top" | "all";
 
@@ -59,7 +60,7 @@ export default function TasksPage() {
           <button key={p.id} role="tab" aria-selected={preset === p.id} type="button" onClick={() => setPreset(p.id)}
             className={cn("h-7 cursor-pointer rounded-full border px-3 text-xs font-medium transition-colors",
               preset === p.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}>
-            {p.label}
+            {t(p.label)}
           </button>
         ))}
       </div>
@@ -70,12 +71,12 @@ export default function TasksPage() {
         </div>
         <Select aria-label="Status" className="w-36" value={status} onChange={(e) => setStatus(e.target.value)} options={TASK_STATUSES} placeholder="Any status" />
         <Select aria-label="Priority" className="w-36" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITIES} placeholder="Any priority" />
-        <Input aria-label="Due after" type="date" className="w-36" value={dueAfter} onChange={(e) => setDueAfter(e.target.value)} title="Due on/after" />
-        <Input aria-label="Due before" type="date" className="w-36" value={dueBefore} onChange={(e) => setDueBefore(e.target.value)} title="Due on/before" />
+        <Input aria-label="Due after" type="date" className="w-36" value={dueAfter} onChange={(e) => setDueAfter(e.target.value)} title={t("Due after")} />
+        <Input aria-label="Due before" type="date" className="w-36" value={dueBefore} onChange={(e) => setDueBefore(e.target.value)} title={t("Due before")} />
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-muted-foreground tabular-nums">{query.data?.total ?? 0} task(s)</span>
-          <Segmented ariaLabel="Task view" value={view} onChange={setView} options={[{ value: "table", label: <><LayoutList /> Table</> }, { value: "kanban", label: <><Columns3 /> Kanban</> }]} />
-          <Button onClick={() => openCreate({ kind: "task", projectId: projectFilter ?? undefined })}><Plus /> Task</Button>
+          <span className="text-xs text-muted-foreground tabular-nums">{t("{n} task(s)", { n: query.data?.total ?? 0 })}</span>
+          <Segmented ariaLabel="Task view" value={view} onChange={setView} options={[{ value: "table", label: <><LayoutList /> {t("Table")}</> }, { value: "kanban", label: <><Columns3 /> {t("Kanban")}</> }]} />
+          <Button onClick={() => openCreate({ kind: "task", projectId: projectFilter ?? undefined })}><Plus /> {t("Task")}</Button>
         </div>
       </div>
       {query.isLoading ? (

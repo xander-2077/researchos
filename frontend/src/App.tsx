@@ -18,6 +18,7 @@ import TimelinePage from "@/pages/Timeline";
 import { ApiError } from "@/services/api";
 import { EmptyState } from "@/components/ui/misc";
 import { Link } from "react-router-dom";
+import { I18nProvider, t } from "@/i18n";
 
 export function makeQueryClient() {
   return new QueryClient({
@@ -34,7 +35,7 @@ export function makeQueryClient() {
 }
 
 function NotFound() {
-  return <EmptyState title="Page not found" action={<Link to="/" className="text-primary hover:underline">Go to overview</Link>} />;
+  return <EmptyState title="Page not found" action={<Link to="/" className="text-primary hover:underline">{t("Go to overview")}</Link>} />;
 }
 
 function Gate() {
@@ -70,9 +71,11 @@ function Gate() {
 export function Providers({ children, client }: { children: ReactNode; client: QueryClient }) {
   return (
     <QueryClientProvider client={client}>
-      <AppStateProvider>
-        <AuthProvider>{children}</AuthProvider>
-      </AppStateProvider>
+      <I18nProvider>
+        <AppStateProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </AppStateProvider>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

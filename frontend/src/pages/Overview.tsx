@@ -11,6 +11,7 @@ import { useAppState } from "@/hooks/app-state";
 import { useActivity, useDeadlines, useNeedsReview, useProjects, useSummary } from "@/hooks/queries";
 import { cn, relativeTime } from "@/lib/utils";
 import { HEALTHS, PRIORITIES, STAGES } from "@/types/api";
+import { t } from "@/i18n";
 
 function readView(): "grid" | "table" {
   try {
@@ -24,7 +25,7 @@ function StatCard({ label, value, icon, to, tone, hint }: { label: string; value
   return (
     <Link to={to} className="group rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-primary/40" data-testid={`stat-${label}`}>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{label}</span>
+        <span>{t(label)}</span>
         <span className={cn("[&_svg]:size-4", tone === "danger" && value ? "text-danger" : tone === "warning" && value ? "text-warning" : "")}>{icon}</span>
       </div>
       <div className="mt-1.5 flex items-baseline gap-2">
@@ -60,22 +61,22 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
         <Select aria-label="Filter by health" className="w-36" value={health} onChange={(e) => setHealth(e.target.value)} options={HEALTHS} placeholder="All health" />
         {showArchiveFilter && (
           <Select aria-label="Archived filter" className="w-32" value={archived} onChange={(e) => setArchived(e.target.value as typeof archived)}>
-            <option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option>
+            <option value="active">{t("Active")}</option><option value="archived">{t("Archived")}</option><option value="all">{t("All")}</option>
           </Select>
         )}
         <Select aria-label="Sort projects" className="w-44" value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="priority">Sort: Priority</option>
-          <option value="next_deadline">Sort: Next deadline</option>
-          <option value="last_activity">Sort: Last activity</option>
-          <option value="-updated_at">Sort: Last updated</option>
-          <option value="stage">Sort: Stage</option>
-          <option value="health_status">Sort: Health</option>
-          <option value="title">Sort: Name</option>
+          <option value="priority">{t("Sort: Priority")}</option>
+          <option value="next_deadline">{t("Sort: Next deadline")}</option>
+          <option value="last_activity">{t("Sort: Last activity")}</option>
+          <option value="-updated_at">{t("Sort: Last updated")}</option>
+          <option value="stage">{t("Sort: Stage")}</option>
+          <option value="health_status">{t("Sort: Health")}</option>
+          <option value="title">{t("Sort: Name")}</option>
         </Select>
         <div className="ml-auto flex items-center gap-2">
           <Segmented ariaLabel="View mode" value={view} onChange={setView} options={[
-            { value: "grid", label: <><LayoutGrid /> Cards</>, title: "Card grid" },
-            { value: "table", label: <><Rows3 /> Table</>, title: "Table" },
+            { value: "grid", label: <><LayoutGrid /> {t("Cards")}</> },
+            { value: "table", label: <><Rows3 /> {t("Table")}</> },
           ]} />
         </div>
       </div>
@@ -89,7 +90,7 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
             icon={<FolderKanban className="size-4" />}
             title={filtered ? "No projects match these filters" : archived === "archived" ? "No archived projects" : "No research projects yet"}
             description={filtered ? "Try clearing a filter." : "Create your first project to start tracking milestones, tasks and experiments."}
-            action={!filtered && archived !== "archived" ? <Button onClick={() => openCreate({ kind: "project" })}><Plus /> New project</Button> : undefined}
+            action={!filtered && archived !== "archived" ? <Button onClick={() => openCreate({ kind: "project" })}><Plus /> {t("New project")}</Button> : undefined}
           />
         </Card>
       ) : view === "grid" ? (
@@ -113,9 +114,9 @@ export default function OverviewPage() {
     <div className="space-y-6">
       <section aria-label="Summary" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Active Projects" value={d?.active_projects} icon={<FolderKanban />} to="/projects" />
-        <StatCard label="Open Tasks" value={d?.open_tasks} icon={<ListTodo />} to="/tasks" hint={d?.overdue_tasks ? `${d.overdue_tasks} overdue` : undefined} />
-        <StatCard label="Running Experiments" value={d?.running_experiments} icon={<FlaskConical />} to="/experiments?status=running" hint={d?.experiments_needing_review ? `${d.experiments_needing_review} to review` : undefined} />
-        <StatCard label="Upcoming Deadlines" value={d?.upcoming_deadlines} icon={<CalendarClock />} to="/timeline" tone="warning" hint="next 14 days" />
+        <StatCard label="Open Tasks" value={d?.open_tasks} icon={<ListTodo />} to="/tasks" hint={d?.overdue_tasks ? t("{n} overdue", { n: d.overdue_tasks }) : undefined} />
+        <StatCard label="Running Experiments" value={d?.running_experiments} icon={<FlaskConical />} to="/experiments?status=running" hint={d?.experiments_needing_review ? t("{n} to review", { n: d.experiments_needing_review }) : undefined} />
+        <StatCard label="Upcoming Deadlines" value={d?.upcoming_deadlines} icon={<CalendarClock />} to="/timeline" tone="warning" hint={t("next 14 days")} />
         <StatCard label="Blocked Projects" value={d?.blocked_projects} icon={<AlertOctagon />} to="/projects" tone="danger" />
       </section>
       {s.isError && <Card><ErrorState error={s.error} onRetry={() => s.refetch()} /></Card>}
@@ -124,7 +125,7 @@ export default function OverviewPage() {
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader title="Upcoming Deadlines" sub="Next 30 days, incl. overdue" action={<Link to="/timeline" className="text-xs text-primary hover:underline">All</Link>} />
+          <CardHeader title="Upcoming Deadlines" sub="Next 30 days, incl. overdue" action={<Link to="/timeline" className="text-xs text-primary hover:underline">{t("All")}</Link>} />
           <div className="px-4 py-1">
             {deadlines.isLoading ? <div className="space-y-2 py-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-9" />)}</div>
               : deadlines.isError ? <ErrorState error={deadlines.error} onRetry={() => deadlines.refetch()} />
@@ -133,7 +134,7 @@ export default function OverviewPage() {
           </div>
         </Card>
         <Card>
-          <CardHeader title="Recent Research Activity" action={<Link to="/activity" className="text-xs text-primary hover:underline">All</Link>} />
+          <CardHeader title="Recent Research Activity" action={<Link to="/activity" className="text-xs text-primary hover:underline">{t("All")}</Link>} />
           <div className="px-4 py-3">
             {activity.isLoading ? <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-9" />)}</div>
               : activity.isError ? <ErrorState error={activity.error} onRetry={() => activity.refetch()} />
@@ -142,7 +143,7 @@ export default function OverviewPage() {
           </div>
         </Card>
         <Card>
-          <CardHeader title="Experiments Needing Review" action={<Link to="/experiments?status=needs_review" className="text-xs text-primary hover:underline">All</Link>} />
+          <CardHeader title="Experiments Needing Review" action={<Link to="/experiments?status=needs_review" className="text-xs text-primary hover:underline">{t("All")}</Link>} />
           <div className="px-4 py-1">
             {review.isLoading ? <div className="space-y-2 py-2">{[0, 1].map((i) => <Skeleton key={i} className="h-9" />)}</div>
               : review.isError ? <ErrorState error={review.error} onRetry={() => review.refetch()} />
@@ -154,7 +155,7 @@ export default function OverviewPage() {
                         <FlaskConical className="size-4 shrink-0 text-muted-foreground" />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[13px] font-medium">{e.name}</div>
-                          <div className="truncate text-[11px] text-muted-foreground">{e.project_title}{e.group_name && ` · ${e.group_name}`} · {e.run_count} run(s) · {relativeTime(e.updated_at)}</div>
+                          <div className="truncate text-[11px] text-muted-foreground">{e.project_title}{e.group_name && ` · ${e.group_name}`} · {t("{n} run(s)", { n: e.run_count })} · {relativeTime(e.updated_at)}</div>
                         </div>
                         <Badge value="needs_review" />
                       </Link>

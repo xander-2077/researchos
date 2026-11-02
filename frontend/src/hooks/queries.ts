@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, ApiError } from "@/services/api";
+import { t } from "@/i18n";
 
 type Q = Record<string, string | number | boolean | null | undefined>;
 
@@ -34,11 +35,11 @@ export function useWrite<TVars, TRes>(
     mutationFn: fn,
     onSuccess: async (res, vars) => {
       await qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "me" });
-      if (opts.success) toast.success(typeof opts.success === "function" ? opts.success(res, vars) : opts.success);
+      if (opts.success) toast.success(typeof opts.success === "function" ? opts.success(res, vars) : t(opts.success));
       opts.onSuccess?.(res, vars);
     },
     onError: (err) => {
-      toast.error(err instanceof ApiError ? err.message : "Request failed");
+      toast.error(t(err instanceof ApiError ? err.message : "Request failed"));
     },
   });
 }
