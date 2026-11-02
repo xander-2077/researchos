@@ -76,11 +76,11 @@ const del = <T>(p: string) => request<T>("DELETE", p);
 export type ProjectInput = Partial<
   Pick<Project, "title" | "slug" | "description" | "research_question" | "hypothesis" | "target_venue"
     | "submission_deadline" | "stage" | "health_status" | "priority" | "repository_url" | "next_action"
-    | "blocker_summary" | "notes" | "links" | "archived">
+    | "blocker_summary" | "notes" | "links" | "archived" | "icon" | "color">
 > & { version?: number };
 
 export type TaskInput = Partial<
-  Pick<Task, "project_id" | "milestone_id" | "title" | "description" | "status" | "priority" | "start_date" | "due_date"
+  Pick<Task, "project_id" | "milestone_id" | "title" | "description" | "status" | "priority" | "sort_order" | "start_date" | "due_date"
     | "depends_on" | "tags" | "git_reference" | "notes">
 >;
 export type MilestoneInput = Partial<Pick<Milestone, "title" | "description" | "status" | "due_date">>;
@@ -119,6 +119,7 @@ export const api = {
   project: (ref: string | number) => get<Project>(`/projects/${ref}`),
   createProject: (b: ProjectInput) => post<Project>("/projects", b),
   updateProject: (id: number, b: ProjectInput) => patch<Project>(`/projects/${id}`, b),
+  reorderProjects: (ids: number[]) => post<void>("/projects/reorder", { ids }),
   archiveProject: (id: number) => del<Project>(`/projects/${id}`),
 
   milestones: (projectId: number) => get<Milestone[]>(`/projects/${projectId}/milestones`),

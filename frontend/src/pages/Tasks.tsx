@@ -3,7 +3,8 @@ import { Columns3, LayoutList, ListTodo, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
 import { Card, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
-import { TaskKanban, TaskTable } from "@/features/common";
+import { TaskTable } from "@/features/common";
+import { TaskKanban } from "@/features/kanban";
 import { useAppState } from "@/hooks/app-state";
 import { useTasks } from "@/hooks/queries";
 import { cn, todayISO } from "@/lib/utils";
@@ -24,7 +25,13 @@ const PRESETS: { id: Preset; label: string }[] = [
 export default function TasksPage() {
   const { projectFilter, openCreate } = useAppState();
   const [preset, setPreset] = useState<Preset>("open");
-  const [view, setView] = useState<"table" | "kanban">("table");
+  const [view, setViewState] = useState<"table" | "kanban">(() => {
+    try { return localStorage.getItem("researchos-tasks-view") === "kanban" ? "kanban" : "table"; } catch { return "table"; }
+  });
+  const setView = (v: "table" | "kanban") => {
+    setViewState(v);
+    try { localStorage.setItem("researchos-tasks-view", v); } catch { /* ignore */ }
+  };
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
   const [dueAfter, setDueAfter] = useState("");
@@ -71,9 +78,13 @@ export default function TasksPage() {
         </div>
         <Select aria-label="Status" className="w-36" value={status} onChange={(e) => setStatus(e.target.value)} options={TASK_STATUSES} placeholder="Any status" />
         <Select aria-label="Priority" className="w-36" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITIES} placeholder="Any priority" />
-        <Input aria-label="Due after" type="date" className="w-36" value={dueAfter} onChange={(e) => setDueAfter(e.target.value)} title={t("Due after")} />
-        <Input aria-label="Due before" type="date" className="w-36" value={dueBefore} onChange={(e) => setDueBefore(e.target.value)} title={t("Due before")} />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>{t("Deadline")}</span>
+          <Input aria-label="Due after" type="date" className="w-36" value={dueAfter} onChange={(e) => setDueAfter(e.target.value)} title={t("Due after")} />
+          <span aria-hidden>–</span>
+          <Input aria-label="Due before" type="date" className="w-36" value={dueBefore} onChange={(e) => setDueBefore(e.target.value)} title={t("Due before")} />
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <span className="text-xs text-muted-foreground tabular-nums">{t("{n} task(s)", { n: query.data?.total ?? 0 })}</span>
           <Segmented ariaLabel="Task view" value={view} onChange={setView} options={[{ value: "table", label: <><LayoutList /> {t("Table")}</> }, { value: "kanban", label: <><Columns3 /> {t("Kanban")}</> }]} />
           <Button onClick={() => openCreate({ kind: "task", projectId: projectFilter ?? undefined })}><Plus /> {t("Task")}</Button>

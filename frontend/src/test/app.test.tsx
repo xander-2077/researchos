@@ -58,13 +58,36 @@ describe("portfolio", () => {
     expect(await screen.findByRole("columnheader", { name: /Project/ })).toBeInTheDocument();
   });
 
-  it("filters by stage via the API", async () => {
-    state = installFakeApi({ projects: [makeProject({ title: "A", stage: "writing" }), makeProject({ title: "B", stage: "ideation" })] });
-    renderApp();
+  it("reorders project cards (keyboard on the drag grip) and saves the order", async () => {
+    state = installFakeApi({ projects: [makeProject({ id: 1, title: "A" }), makeProject({ id: 2, title: "B" }), makeProject({ id: 3, title: "C" })] });
+    renderApp("/projects");
     await screen.findAllByTestId("project-card");
-    await userEvent.selectOptions(screen.getByLabelText("Filter by stage"), "writing");
-    await waitFor(() => expect(screen.getAllByTestId("project-card")).toHaveLength(1));
-    expect(state.calls.some((c) => c.path === "/projects" && c.method === "GET")).toBe(true);
+    expect(screen.queryByLabelText("Filter by stage")).not.toBeInTheDocument(); // no stage/priority/health sorting any more
+    const titles = () => screen.getAllByTestId("project-card").map((c) => within(c).getByRole("heading").textContent);
+    expect(titles()).toEqual(["A", "B", "C"]);
+    screen.getByRole("button", { name: "Reorder A" }).focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await waitFor(() => expect(state.calls.find((c) => c.path === "/projects/reorder")?.body).toEqual({ ids: [2, 1, 3] }));
+    await waitFor(() => expect(titles()).toEqual(["B", "A", "C"]));
+  });
+
+  it("drags a project card onto another to reorder", async () => {
+    state = installFakeApi({ projects: [makeProject({ id: 1, title: "A" }), makeProject({ id: 2, title: "B" }), makeProject({ id: 3, title: "C" })] });
+    renderApp("/projects");
+    const cards = await screen.findAllByTestId("project-card");
+    const target = cards[2].closest("[data-sort-id]") as HTMLElement;
+    const orig = document.elementFromPoint;
+    document.elementFromPoint = () => target;
+    try {
+      const down = new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 });
+      Object.defineProperty(down, "pointerType", { value: "mouse" });
+      cards[0].dispatchEvent(down);
+      window.dispatchEvent(new MouseEvent("pointermove", { clientX: 600, clientY: 20 }));
+      window.dispatchEvent(new MouseEvent("pointerup", { clientX: 600, clientY: 20 }));
+    } finally {
+      document.elementFromPoint = orig;
+    }
+    await waitFor(() => expect(state.calls.find((c) => c.path === "/projects/reorder")?.body).toEqual({ ids: [2, 3, 1] }));
   });
 });
 
@@ -212,7 +235,7 @@ describe("kanban drag", () => {
     }
     await waitFor(() => {
       const patch = state.calls.find((c) => c.method === "PATCH" && c.path === "/tasks/9");
-      expect(patch?.body).toEqual({ status: "blocked" });
+      expect(patch?.body).toEqual({ status: "blocked", sort_order: 1024 });
     });
   });
 });

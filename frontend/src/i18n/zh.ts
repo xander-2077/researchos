@@ -201,4 +201,12 @@ export const zh: Record<string, string> = {
   "Start date must not be after the deadline": "开始日期不能晚于截止日期",
   "start_date must not be after due_date": "开始日期不能晚于截止日期",
   "Dependency cycle detected": "检测到循环依赖", "A task cannot depend on itself": "任务不能依赖自身",
+  // ---------------------------------------------------------------- ordering & project icons
+  "Order saved": "顺序已保存", "Drag cards to reorder": "拖动卡片调整顺序", "Reorder {title}": "调整“{title}”的位置",
+  "Drag to reorder (or focus and use the arrow keys)": "拖动以调整顺序（或聚焦后用方向键）",
+  "Drag to move (↑/↓ to reorder)": "拖动以移动（↑/↓ 调整顺序）", "Add {s} task": "添加“{s}”任务",
+  "Icon updated": "图标已更新", "Change icon": "更换图标", "Project icon": "项目图标", Colour: "颜色", Default: "默认",
+  Blue: "蓝", Indigo: "靛蓝", Purple: "紫", Pink: "粉", Red: "红", Orange: "橙", Amber: "琥珀", Green: "绿", Teal: "青绿",
+  Cyan: "青", Slate: "石板灰", "Search icons…": "搜索图标…", "No icons match": "没有匹配的图标",
+  Science: "科学", Robotics: "机器人", "Data & code": "数据与代码", "Vision & 3D": "视觉与 3D",
 };

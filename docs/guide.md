@@ -37,7 +37,9 @@ experiments in the browser, and let Claude Code or Codex read and update them ov
 ### Cross-project views
 
 - **Tasks**: presets (Open, Top priority, Due in 7 days, Overdue, Blocked, All) plus status/priority/date/keyword filters; overdue rows are highlighted.
-- **Gantt** (Timeline page, default): tasks as bars grouped by project, with milestones, submission deadlines, a today line and finish-to-start dependency arrows (red = a task starts before its prerequisite finishes). Drag a bar to reschedule it, drag its edges to resize, or use the keyboard (←/→ move, Shift+←/→ change the end date, Enter edit). Set a task's **Start date** and **Depends on** in the task form. Zoom: day / week / month.
+- **Projects**: drag cards to set their order (touch: use the grip; keyboard: focus the grip and press the arrow keys). The order is shared by the overview, the sidebar and agents (`GET /projects` defaults to `sort=manual`). Click a project's icon (project page or edit dialog) to pick an icon and colour from the built-in research icon library.
+- **Kanban**: drag cards between columns to change status and within a column to reorder (grip + ↑/↓ on the keyboard).
+- **Gantt** (Timeline page, default; also a *Gantt* tab on every project): tasks as bars grouped by project, with milestones, submission deadlines, a today line and finish-to-start dependency arrows (red = a task starts before its prerequisite finishes). Drag a bar to reschedule it, drag its edges to resize, or use the keyboard (←/→ move, Shift+←/→ change the end date, Enter edit). Set a task's **Start date** and **Depends on** in the task form. Zoom: day / week / month.
 - **Timeline**: per-project near-term timeline, or switch to **Calendar** for a month view of submissions, milestones and task due dates.
 - **Activity**: filter by project, source, event type and time.
 - **Global search** (⌘K / Ctrl+K) across projects, tasks and experiments.

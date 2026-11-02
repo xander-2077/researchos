@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
-import { useDeadlines, useTasks, useWrite } from "@/hooks/queries";
+import { useDeadlines, useProjects, useTasks, useWrite } from "@/hooks/queries";
+import { ProjectIcon } from "@/components/icons/project-icons";
 import { api } from "@/services/api";
 import { cn, formatDate, parseDate, todayISO } from "@/lib/utils";
 import { PX_PER_DAY, computeRange, diffDays, shiftSpan, taskSpan, violatesDependency, xOf, type Span, type Zoom } from "@/lib/gantt";
@@ -24,8 +25,9 @@ type Row =
 const BAR_TONE: Record<string, string> = {
   todo: "bg-primary/30 text-foreground",
   in_progress: "bg-primary text-primary-foreground",
-  blocked: "bg-danger text-white",
-  done: "bg-success/75 text-white",
+  // Light text on saturated fills in light mode; dark text on the lighter dark-mode fills.
+  blocked: "bg-danger text-white dark:text-[#1b0d10]",
+  done: "bg-success/80 text-white dark:text-[#0b1f16]",
 };
 
 function loadZoom(): Zoom {
@@ -50,6 +52,8 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
   const today = todayISO();
 
   const tasksQ = useTasks({ limit: 500, sort: "due_date", ...(projectId ? { project_id: projectId } : {}) });
+  const projectsQ = useProjects({ include_all: true, limit: 200 });
+  const projectById = useMemo(() => new Map((projectsQ.data?.items ?? []).map((x) => [x.id, x])), [projectsQ.data]);
   const marksQ = useDeadlines({ days: 730, kinds: "milestone,submission", include_overdue: true, limit: 500, project_id: projectId ?? undefined });
   const move = useWrite((v: { id: number; span: Span }) => api.updateTask(v.id, { start_date: v.span.start, due_date: v.span.end }));
 
@@ -242,6 +246,7 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
                       onClick={() => setCollapsed((s) => { const n = new Set(s); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })}>
                       {collapsed.has(r.id) ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                     </button>
+                    <ProjectIcon icon={projectById.get(r.id)?.icon} color={projectById.get(r.id)?.color} size="xs" />
                     <Link to={`/projects/${r.slug}`} className="min-w-0 flex-1 truncate text-[13px] font-medium hover:text-primary">{r.title}</Link>
                     <span className="shrink-0 text-[11px] text-muted-foreground">{r.done}/{r.total}</span>
                   </div>
@@ -358,7 +363,7 @@ function Legend() {
   );
   return (
     <div className="ml-auto hidden flex-wrap items-center gap-3 md:flex">
-      {item("bg-primary/30", "Todo")}{item("bg-primary", "In Progress")}{item("bg-danger", "Blocked")}{item("bg-success/75", "Done")}
+      {item("bg-primary/30", "Todo")}{item("bg-primary", "In Progress")}{item("bg-danger", "Blocked")}{item("bg-success/80", "Done")}
       <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><span className="size-2 rotate-45 rounded-[2px] bg-primary" />{t("Milestone")}</span>
       <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Flag className="size-3 fill-danger text-danger" />{t("Submission")}</span>
     </div>

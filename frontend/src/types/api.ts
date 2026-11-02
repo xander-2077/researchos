@@ -73,6 +73,11 @@ export interface Project {
   created_at: string;
   updated_at: string;
   version: number;
+  sort_order: number;
+  /** icon key from the project icon library ("" = default) */
+  icon: string;
+  /** #rrggbb or "" */
+  color: string;
   milestone_progress: { completed: number; total: number; percent: number | null };
   next_milestone: { id: number; title: string; due_date: string | null; status: string } | null;
   next_deadline: DeadlineRef | null;
@@ -104,6 +109,7 @@ export interface Task {
   description: string;
   status: TaskStatus;
   priority: Priority;
+  sort_order: number;
   start_date: string | null;
   due_date: string | null;
   depends_on: number[];

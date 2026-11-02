@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from sqlalchemy import String, case, cast, select
+from sqlalchemy import String, case, cast, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.actor import Actor
@@ -15,7 +15,7 @@ from app.schemas.entities import TaskCreate, TaskUpdate
 from app.services.activity import log_event
 from app.services.projects import validate_milestone_belongs
 
-SORTABLE = {"title", "status", "priority", "start_date", "due_date", "created_at", "updated_at"}
+SORTABLE = {"title", "status", "priority", "sort_order", "start_date", "due_date", "created_at", "updated_at"}
 _PRIORITY_ORDER = case({"critical": 0, "high": 1, "medium": 2, "low": 3}, value=Task.priority, else_=9)
 
 
@@ -178,6 +178,8 @@ def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
             return update_task(db, actor, existing.id, TaskUpdate(**fields))
     fields = data.model_dump()
     deps = fields.pop("depends_on")
+    if fields.get("sort_order") is None:
+        fields["sort_order"] = (db.scalar(select(func.max(Task.sort_order))) or 0) + 1024
     t = Task(**fields)
     if t.status == "done":
         t.completed_at = utcnow()
@@ -199,6 +201,8 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
     actor.require_write()
     t = get_or_404(db, Task, task_id, "Task")
     changes = {k: v for k, v in data.model_dump(exclude_unset=True).items() if getattr(t, k) != v}
+    if changes.get("sort_order", 0) is None:
+        del changes["sort_order"]
     if not changes:
         return t
     if "project_id" in changes:
@@ -223,7 +227,7 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
     if new_deps is not None:
         changes["depends_on"] = new_deps
     _status_side_effects(db, actor, t, old_status)
-    others = sorted(set(changes) - {"status"})
+    others = sorted(set(changes) - {"status", "sort_order"})  # reordering is not worth an event
     if others:
         log_event(db, actor, project_id=t.project_id, event_type="task_updated",
                   summary=f"Task '{t.title}' updated: {', '.join(others)}", resource_type="task", resource_id=t.id)

@@ -6,11 +6,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form";
 import { Badge, Card, CardHeader, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
-import { ActivityList, DeadlineList, ProjectCard, ProjectTable } from "@/features/common";
+import { ActivityList, DeadlineList, ProjectTable } from "@/features/common";
+import { SortableProjectGrid } from "@/features/project-grid";
 import { useAppState } from "@/hooks/app-state";
 import { useActivity, useDeadlines, useNeedsReview, useProjects, useSummary } from "@/hooks/queries";
 import { cn, relativeTime } from "@/lib/utils";
-import { HEALTHS, PRIORITIES, STAGES } from "@/types/api";
 import { t } from "@/i18n";
 
 function readView(): "grid" | "table" {
@@ -36,71 +36,55 @@ function StatCard({ label, value, icon, to, tone, hint }: { label: string; value
   );
 }
 
-export function Portfolio({ defaultArchived = "active", showArchiveFilter = false }: { defaultArchived?: "active" | "archived" | "all"; showArchiveFilter?: boolean }) {
+export function Portfolio({ defaultArchived = "active", showArchiveFilter = false, action }: {
+  defaultArchived?: "active" | "archived" | "all"; showArchiveFilter?: boolean; action?: ReactNode;
+}) {
   const { openCreate } = useAppState();
   const [view, setViewState] = useState<"grid" | "table">(readView);
-  const [stage, setStage] = useState("");
-  const [priority, setPriority] = useState("");
-  const [health, setHealth] = useState("");
   const [archived, setArchived] = useState(defaultArchived);
-  const [sort, setSort] = useState("priority");
   const setView = (v: "grid" | "table") => {
     setViewState(v);
     try { localStorage.setItem("researchos-portfolio-view", v); } catch { /* ignore */ }
   };
+  // Few projects, one order: the manual (drag-and-drop) order is used everywhere.
   const q = useProjects({
-    stage, priority, health_status: health, sort, limit: 200,
+    sort: "manual", limit: 200,
     ...(archived === "all" ? { include_all: true } : { archived: archived === "archived" }),
   });
-  const filtered = !!(stage || priority || health);
   return (
     <section aria-label="Projects">
-      <div className="mb-1 flex items-center gap-2">
+      <div className="ros-toolbar mb-4">
         <h2 className="text-sm font-semibold">{t("Projects")}</h2>
         {q.data && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">{q.data.total}</span>}
-      </div>
-      <div className="ros-toolbar mb-4">
-        <Select aria-label="Filter by stage" className="w-40" value={stage} onChange={(e) => setStage(e.target.value)} options={STAGES} placeholder="All stages" />
-        <Select aria-label="Filter by priority" className="w-36" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITIES} placeholder="All priorities" />
-        <Select aria-label="Filter by health" className="w-36" value={health} onChange={(e) => setHealth(e.target.value)} options={HEALTHS} placeholder="All health" />
-        {showArchiveFilter && (
-          <Select aria-label="Archived filter" className="w-32" value={archived} onChange={(e) => setArchived(e.target.value as typeof archived)}>
-            <option value="active">{t("Active")}</option><option value="archived">{t("Archived")}</option><option value="all">{t("All")}</option>
-          </Select>
-        )}
-        <Select aria-label="Sort projects" className="w-44" value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="priority">{t("Sort: Priority")}</option>
-          <option value="next_deadline">{t("Sort: Next deadline")}</option>
-          <option value="last_activity">{t("Sort: Last activity")}</option>
-          <option value="-updated_at">{t("Sort: Last updated")}</option>
-          <option value="stage">{t("Sort: Stage")}</option>
-          <option value="health_status">{t("Sort: Health")}</option>
-          <option value="title">{t("Sort: Name")}</option>
-        </Select>
-        <div className="ml-auto flex items-center gap-2">
+        {view === "grid" && (q.data?.items.length ?? 0) > 1 && <span className="hidden text-xs text-muted-foreground sm:inline">{t("Drag cards to reorder")}</span>}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {showArchiveFilter && (
+            <Select aria-label="Archived filter" className="w-32" value={archived} onChange={(e) => setArchived(e.target.value as typeof archived)}>
+              <option value="active">{t("Active")}</option><option value="archived">{t("Archived")}</option><option value="all">{t("All")}</option>
+            </Select>
+          )}
           <Segmented ariaLabel="View mode" value={view} onChange={setView} options={[
             { value: "grid", label: <><LayoutGrid /> {t("Cards")}</> },
             { value: "table", label: <><Rows3 /> {t("Table")}</> },
           ]} />
+          {action}
         </div>
       </div>
       {q.isLoading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-64" />)}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-64" />)}</div>
       ) : q.isError ? (
         <Card><ErrorState error={q.error} onRetry={() => q.refetch()} /></Card>
       ) : !q.data?.items.length ? (
         <Card>
           <EmptyState
             icon={<FolderKanban className="size-4" />}
-            title={filtered ? "No projects match these filters" : archived === "archived" ? "No archived projects" : "No research projects yet"}
-            description={filtered ? "Try clearing a filter." : "Create your first project to start tracking milestones, tasks and experiments."}
-            action={!filtered && archived !== "archived" ? <Button onClick={() => openCreate({ kind: "project" })}><Plus /> {t("New project")}</Button> : undefined}
+            title={archived === "archived" ? "No archived projects" : "No research projects yet"}
+            description="Create your first project to start tracking milestones, tasks and experiments."
+            action={archived !== "archived" ? <Button onClick={() => openCreate({ kind: "project" })}><Plus /> {t("New project")}</Button> : undefined}
           />
         </Card>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {q.data.items.map((p) => <ProjectCard key={p.id} p={p} />)}
-        </div>
+        <SortableProjectGrid projects={q.data.items} />
       ) : (
         <Card><ProjectTable projects={q.data.items} /></Card>
       )}

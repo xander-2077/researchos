@@ -23,6 +23,22 @@ from app.core.enums import (
 )
 from app.schemas.common import Link, ORMModel, clean_tags, normalize_links, normalize_metrics
 
+ICON_RE = re.compile(r"^[a-z0-9-]{0,40}$")
+COLOR_RE = re.compile(r"^(#[0-9a-fA-F]{6})?$")
+
+
+def _check_icon(v: str | None) -> str | None:
+    if v is not None and not ICON_RE.match(v):
+        raise ValueError("icon must be an icon key such as 'flask-conical'")
+    return v
+
+
+def _check_color(v: str | None) -> str | None:
+    if v is not None and not COLOR_RE.match(v):
+        raise ValueError("color must be a hex colour like #3e63dd (or empty)")
+    return v.lower() if v else v
+
+
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,78}[a-z0-9]?$")
 KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 
@@ -47,6 +63,18 @@ class ProjectBase(Strict):
     blocker_summary: str = Field(default="", max_length=2_000)
     notes: str = Field(default="", max_length=200_000)
     links: list[Link] = Field(default_factory=list, max_length=50)
+    icon: str = Field(default="", max_length=40, description="Icon key from the UI icon library")
+    color: str = Field(default="", max_length=7, description="Icon colour, #rrggbb")
+
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, v: str | None) -> str | None:
+        return _check_icon(v)
+
+    @field_validator("color")
+    @classmethod
+    def _color(cls, v: str | None) -> str | None:
+        return _check_color(v)
 
 
 class ProjectCreate(ProjectBase):
@@ -78,6 +106,8 @@ class ProjectUpdate(Strict):
     blocker_summary: str | None = Field(default=None, max_length=2_000)
     notes: str | None = Field(default=None, max_length=200_000)
     links: list[Link] | None = Field(default=None, max_length=50)
+    icon: str | None = Field(default=None, max_length=40)
+    color: str | None = Field(default=None, max_length=7)
     archived: bool | None = None
     version: int | None = Field(default=None, description="Optimistic concurrency check")
     confirm: bool = Field(
@@ -94,6 +124,16 @@ class ProjectUpdate(Strict):
         if v is not None and v.isdigit():
             raise ValueError("slug cannot consist only of digits (it would clash with project ids)")
         return v
+
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, v: str | None) -> str | None:
+        return _check_icon(v)
+
+    @field_validator("color")
+    @classmethod
+    def _color(cls, v: str | None) -> str | None:
+        return _check_color(v)
 
 
 class MilestoneProgress(BaseModel):
@@ -123,6 +163,13 @@ class ProjectOut(ORMModel):
     created_at: datetime
     updated_at: datetime
     version: int
+    sort_order: int = 0
+    icon: str = ""
+    color: str = ""
+
+
+class ProjectReorder(Strict):
+    ids: list[int] = Field(min_length=1, max_length=500, description="Project ids in the desired order")
 
 
 class ProjectSummary(ProjectOut):
@@ -173,6 +220,7 @@ class TaskCreate(Strict):
     description: str = Field(default="", max_length=20_000)
     status: TaskStatus = "todo"
     priority: Priority = "medium"
+    sort_order: float | None = Field(default=None, description="Kanban position; appended at the end if omitted")
     start_date: date | None = None
     due_date: date | None = None
     depends_on: list[int] = Field(default_factory=list, description="Task ids (same project) that must finish first")
@@ -199,6 +247,7 @@ class TaskUpdate(Strict):
     description: str | None = Field(default=None, max_length=20_000)
     status: TaskStatus | None = None
     priority: Priority | None = None
+    sort_order: float | None = None
     start_date: date | None = None
     due_date: date | None = None
     depends_on: list[int] | None = None
@@ -221,6 +270,7 @@ class TaskOut(ORMModel):
     description: str
     status: str
     priority: str
+    sort_order: float
     start_date: date | None
     due_date: date | None
     depends_on: list[int]

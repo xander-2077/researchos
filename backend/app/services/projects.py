@@ -75,7 +75,8 @@ def create_project(db: Session, actor: Actor, data: ProjectCreate) -> Project:
     if db.scalar(select(Project.id).where(Project.slug == slug)) is not None:
         raise Conflict(f"Slug '{slug}' is already used by another project")
     payload["links"] = [link for link in payload["links"]]
-    project = Project(slug=slug, **payload)
+    last = db.scalar(select(func.max(Project.sort_order))) or 0
+    project = Project(slug=slug, sort_order=last + 1, **payload)
     db.add(project)
     db.flush()
     log_event(
@@ -292,10 +293,12 @@ def list_projects(
         stmt = stmt.where(
             Project.title.ilike(like) | Project.description.ilike(like) | Project.slug.ilike(like)
         )
-    sort_key = sort or "priority"
+    sort_key = sort or "manual"
     # priority / deadline / last_activity need custom ordering, done in Python (small N).
     python_sort = sort_key.lstrip("-") in {"priority", "next_deadline", "last_activity"}
-    if not python_sort:
+    if sort_key == "manual":
+        stmt = stmt.order_by(Project.sort_order, Project.id)
+    elif not python_sort:
         stmt = apply_sort(stmt, Project, sort_key, SORTABLE, "-updated_at")
     projects = list(db.scalars(stmt))
     summaries = _summaries(db, projects)
@@ -312,6 +315,27 @@ def list_projects(
     lim = clamp_limit(limit)
     off = max(0, offset or 0)
     return summaries[off : off + lim], total, lim, off
+
+
+def reorder_projects(db: Session, actor: Actor, ids: list[int]) -> None:
+    """Persist a manual order. ``ids`` lists projects in the desired order; projects not listed keep
+    their relative order after the listed ones. Does not bump ``version``/``updated_at`` (a reorder
+    is not an edit of the project and must not invalidate open edit forms)."""
+    actor.require_write()
+    want = list(dict.fromkeys(ids))
+    known = set(db.scalars(select(Project.id).where(Project.id.in_(want))))
+    missing = [i for i in want if i not in known]
+    if missing:
+        raise NotFound(f"Unknown project id(s): {missing}")
+    rest = [i for i in db.scalars(select(Project.id).order_by(Project.sort_order, Project.id)) if i not in set(want)]
+    for pos, pid in enumerate(want + rest, start=1):
+        db.execute(
+            update(Project).where(Project.id == pid)
+            .values(sort_order=pos, updated_at=Project.updated_at)
+            .execution_options(synchronize_session=False)
+        )
+    db.commit()
+    db.expire_all()
 
 
 def project_summary(db: Session, project: Project) -> dict[str, Any]:

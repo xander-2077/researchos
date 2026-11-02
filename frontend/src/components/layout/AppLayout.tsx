@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form";
 import { DropdownContent, DropdownItem, DropdownLabel, DropdownMenu, DropdownSeparator, DropdownTrigger } from "@/components/ui/overlay";
 import { Kbd, Spinner } from "@/components/ui/misc";
+import { ProjectIcon } from "@/components/icons/project-icons";
 import { useAppState, type Theme } from "@/hooks/app-state";
 import { useAuth } from "@/hooks/auth";
 import { useProjects } from "@/hooks/queries";
@@ -33,6 +34,52 @@ const TITLES: Record<string, string> = {
   timeline: "Timeline & Deadlines", activity: "Activity", settings: "Settings", help: "Help",
 };
 
+const BOTTOM = new Set(["/settings", "/help"]);
+
+function NavItem({ to, label: l, icon: Icon, end, collapsed, onClose }: (typeof NAV)[number] & { collapsed: boolean; onClose: () => void }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      onClick={onClose}
+      title={collapsed ? t(l) : undefined}
+      className={({ isActive }) =>
+        cn(
+          "flex h-9 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          isActive && "bg-primary/9 font-medium text-primary hover:bg-primary/12 hover:text-primary",
+          collapsed && "md:justify-center md:px-0",
+        )
+      }
+    >
+      <Icon className="size-4 shrink-0" strokeWidth={1.7} />
+      <span className={cn(collapsed && "md:hidden")}>{t(l)}</span>
+    </NavLink>
+  );
+}
+
+/** Plane-style project list in the sidebar (manual order, with each project's icon). */
+function SidebarProjects({ collapsed, onClose }: { collapsed: boolean; onClose: () => void }) {
+  const { data } = useProjects({ sort: "manual", limit: 200 });
+  const items = data?.items ?? [];
+  if (!items.length) return null;
+  return (
+    <div className="mt-3 flex flex-col gap-0.5" aria-label={t("Projects")}>
+      <div className={cn("px-2.5 pb-1 text-[11px] font-medium text-muted-foreground", collapsed && "md:hidden")}>{t("Projects")}</div>
+      {items.slice(0, 15).map((p) => (
+        <NavLink key={p.id} to={`/projects/${p.slug}`} onClick={onClose} title={p.title}
+          className={({ isActive }) => cn(
+            "flex h-8 shrink-0 items-center gap-2 rounded-md px-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            isActive && "bg-accent font-medium text-foreground",
+            collapsed && "md:justify-center md:px-0",
+          )}>
+          <ProjectIcon icon={p.icon} color={p.color} size="xs" />
+          <span className={cn("truncate", collapsed && "md:hidden")}>{p.title}</span>
+        </NavLink>
+      ))}
+    </div>
+  );
+}
+
 function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const { sidebarCollapsed: collapsed, toggleSidebar } = useAppState();
   const { me, logout } = useAuth();
@@ -48,7 +95,7 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
         )}
         aria-label="Main navigation"
       >
-        <div className={cn("flex h-[76px] shrink-0 items-center gap-2.5 px-4", collapsed && "md:justify-center md:px-0")}>
+        <div className={cn("flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4", collapsed && "md:justify-center md:px-0")}>
           <img src="/favicon.svg" alt="" className="size-7 shrink-0" />
           <div className={cn("min-w-0", collapsed && "md:hidden")}>
             <div className="text-[14px] font-semibold tracking-tight">ResearchOS</div>
@@ -56,28 +103,13 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
           </div>
           <Button variant="ghost" size="icon-sm" className="ml-auto md:hidden" onClick={onClose} aria-label="Close menu"><X /></Button>
         </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-3">
-          <div className={cn("px-2.5 pb-2 pt-1 text-[11px] font-medium text-muted-foreground", collapsed && "md:hidden")}>{t("Workspace")}</div>
-          {NAV.map(({ to, label: l, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={onClose}
-              title={collapsed ? t(l) : undefined}
-              className={({ isActive }) =>
-                cn(
-                  "flex h-9 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                  isActive && "bg-primary/9 font-medium text-primary hover:bg-primary/12 hover:text-primary",
-                  to === "/settings" && "mt-auto",
-                  collapsed && "md:justify-center md:px-0",
-                )
-              }
-            >
-              <Icon className="size-4 shrink-0" strokeWidth={1.7} />
-              <span className={cn(collapsed && "md:hidden")}>{t(l)}</span>
-            </NavLink>
-          ))}
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-3 pt-3">
+          <div className={cn("px-2.5 pb-1 text-[11px] font-medium text-muted-foreground", collapsed && "md:hidden")}>{t("Workspace")}</div>
+          {NAV.filter((n) => !BOTTOM.has(n.to)).map((n) => <NavItem key={n.to} {...n} collapsed={collapsed} onClose={onClose} />)}
+          <SidebarProjects collapsed={collapsed} onClose={onClose} />
+          <div className="mt-auto flex flex-col gap-1 pt-2">
+            {NAV.filter((n) => BOTTOM.has(n.to)).map((n) => <NavItem key={n.to} {...n} collapsed={collapsed} onClose={onClose} />)}
+          </div>
         </nav>
         <div className="shrink-0 border-t border-border p-2.5">
           <div className={cn("flex items-center gap-2", collapsed && "md:flex-col")}>
@@ -140,7 +172,7 @@ function GlobalSearch() {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), setOpen(false))}
-        placeholder={t("Search projects, tasks, experiments…")}
+        placeholder={t("Search…")}
         aria-label="Global search"
         className="h-8 w-full min-w-0 rounded-md border border-transparent bg-muted/70 pl-8 pr-10 text-xs transition-colors placeholder:text-muted-foreground focus:border-input focus:bg-card focus:outline-none focus:ring-2 focus:ring-ring"
       />

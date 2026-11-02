@@ -16,6 +16,7 @@ from app.schemas.entities import (
     MilestoneUpdate,
     ProgressCreate,
     ProjectCreate,
+    ProjectReorder,
     ProjectSummary,
     ProjectUpdate,
 )
@@ -34,7 +35,7 @@ def list_projects(
     archived: bool | None = Query(False, description="false=active only, true=archived only, omit via 'all'"),
     include_all: bool = Query(False, description="Return active and archived"),
     q: str | None = None,
-    sort: str | None = Query(None, description="priority | next_deadline | last_activity | title | stage | updated_at …; '-' for desc"),
+    sort: str | None = Query(None, description="manual (default, drag order) | priority | next_deadline | last_activity | title | stage | updated_at …; '-' for desc"),
     limit: int | None = Query(None, ge=1),
     offset: int = Query(0, ge=0),
     actor: Actor = Depends(get_actor),
@@ -51,6 +52,11 @@ def list_projects(
 def create_project(data: ProjectCreate, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
     p = svc.create_project(db, actor, data)
     return svc.project_summary(db, p)
+
+
+@router.post("/projects/reorder", status_code=204, description="Save the manual (drag-and-drop) order of projects")
+def reorder_projects(data: ProjectReorder, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
+    svc.reorder_projects(db, actor, data.ids)
 
 
 @router.get("/projects/{ref}", response_model=ProjectSummary, description="Lookup by numeric id or slug")

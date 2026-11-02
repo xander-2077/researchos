@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Dialog } from "@/components/ui/overlay";
 import { useMilestones, useProjects, useTasks, useWrite } from "@/hooks/queries";
+import { IconPicker } from "@/components/icons/project-icons";
 import { api, type RunInput } from "@/services/api";
 import { t } from "@/i18n";
 import {
@@ -99,6 +100,8 @@ const projectSchema = z.object({
   repository_url: optionalUrl,
   next_action: z.string().max(2000),
   blocker_summary: z.string().max(2000),
+  icon: z.string().max(40),
+  color: z.string().max(7),
 });
 
 export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: {
@@ -111,6 +114,7 @@ export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: {
     stage: project?.stage ?? "ideation", health_status: project?.health_status ?? "on_track",
     priority: project?.priority ?? "medium", repository_url: project?.repository_url ?? "",
     next_action: project?.next_action ?? "", blocker_summary: project?.blocker_summary ?? "",
+    icon: project?.icon ?? "", color: project?.color ?? "",
   };
   const f = useForm(init, [open, project?.id, project?.version]);
   const m = useWrite(
@@ -128,7 +132,12 @@ export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: {
   const { values: v, errors: e, set } = f;
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title={project ? "Edit project" : "New project"} onSubmit={submit} busy={m.isPending} submitLabel={project ? "Save" : "Create project"} wide>
-      <Field label="Title" required error={e.title} className="sm:col-span-2">{(id) => <Input id={id} value={v.title} onChange={set("title")} autoFocus aria-invalid={!!e.title} placeholder="e.g. Multi-Agent Quadruped Soccer" />}</Field>
+      <Field label="Title" required error={e.title} className="sm:col-span-2">{(id) => (
+        <div className="flex items-center gap-2">
+          <IconPicker icon={v.icon} color={v.color} size="md" onChange={(x) => f.setValues((s) => ({ ...s, ...x }))} />
+          <Input id={id} value={v.title} onChange={set("title")} autoFocus aria-invalid={!!e.title} placeholder="e.g. Multi-Agent Quadruped Soccer" />
+        </div>
+      )}</Field>
       {!project && <Field label="Slug" error={e.slug} hint="Optional; derived from the title" className="sm:col-span-2">{(id) => <Input id={id} value={v.slug} onChange={set("slug")} placeholder="quadruped-soccer" />}</Field>}
       <Field label="Stage">{(id) => <Select id={id} value={v.stage} onChange={set("stage")} options={STAGES} />}</Field>
       <Field label="Health">{(id) => <Select id={id} value={v.health_status} onChange={set("health_status")} options={HEALTHS} />}</Field>

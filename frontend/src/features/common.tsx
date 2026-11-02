@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState,
@@ -7,9 +7,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   AlertOctagon, ArrowDown, ArrowUp, Bot, CalendarClock, CheckCircle2, ChevronsUpDown, CircleDot, Flag, FlaskConical,
-  FolderKanban, GitCommitHorizontal, GripVertical, ListTodo, MoreHorizontal, NotebookPen, Pencil, Terminal, Trash2, User,
+  GitCommitHorizontal, ListTodo, MoreHorizontal, NotebookPen, Pencil, Terminal, Trash2, User,
 } from "lucide-react";
 import { Badge, ProgressBar } from "@/components/ui/misc";
+import { ProjectIcon } from "@/components/icons/project-icons";
 import { Button } from "@/components/ui/button";
 import { DropdownContent, DropdownItem, DropdownMenu, DropdownSeparator, DropdownTrigger, ConfirmDialog } from "@/components/ui/overlay";
 import { useWrite } from "@/hooks/queries";
@@ -55,21 +56,23 @@ export function PriorityIcon({ priority }: { priority: string }) {
 }
 
 // ------------------------------------------------------------------ project card
-export function ProjectCard({ p }: { p: Project }) {
+export function ProjectCard({ p, handle, className }: { p: Project; handle?: ReactNode; className?: string }) {
   const mp = p.milestone_progress;
   return (
     <Link
       to={`/projects/${p.slug}`}
-      className="ros-project-card group flex min-w-0 flex-col gap-3.5 rounded-lg border border-border bg-card p-4 transition-[border-color,box-shadow] hover:border-primary/35 focus-visible:ring-2"
+      draggable={false}
+      className={cn("ros-project-card group flex h-full min-w-0 flex-col gap-3.5 rounded-lg border border-border bg-card p-4 transition-[border-color,box-shadow] hover:border-primary/35 focus-visible:ring-2", className)}
       data-testid="project-card"
     >
       <div className="flex items-start gap-2.5">
-        <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted/70 text-muted-foreground"><FolderKanban className="size-4" strokeWidth={1.6} /></span>
+        <ProjectIcon icon={p.icon} color={p.color} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[14px] font-semibold group-hover:text-primary">{p.title}</h3>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{p.target_venue || p.slug}</p>
         </div>
         <span className="pt-1"><PriorityIcon priority={p.priority} /></span>
+        {handle}
       </div>
       <div className="flex flex-wrap gap-1.5">
         <Badge value={p.stage} />
@@ -170,7 +173,7 @@ export function DataTable<T>({ data, columns, empty, onRowClick, rowClassName, i
 export function ProjectTable({ projects }: { projects: Project[] }) {
   const cols = useMemo<ColumnDef<Project, unknown>[]>(() => [
     { accessorKey: "title", header: t("Project"), cell: ({ row }) => (
-      <Link to={`/projects/${row.original.slug}`} className="font-medium hover:text-primary">{row.original.title}</Link>
+      <Link to={`/projects/${row.original.slug}`} className="inline-flex items-center gap-2 font-medium hover:text-primary"><ProjectIcon icon={row.original.icon} color={row.original.color} size="sm" />{row.original.title}</Link>
     ) },
     { accessorKey: "stage", header: t("Stage"), cell: ({ getValue }) => <Badge value={getValue() as string} /> },
     { accessorKey: "health_status", header: t("Health"), cell: ({ getValue }) => <Badge value={getValue() as string} dot /> },
@@ -267,169 +270,6 @@ export function TaskTable({ tasks, showProject = true, empty }: { tasks: Task[];
         onRowClick={setEditing}
         rowClassName={(t) => (t.due_date && daysUntil(t.due_date)! < 0 && ["todo", "in_progress", "blocked"].includes(t.status) ? "bg-danger/[0.04]" : "")}
       />
-      <TaskFormDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)} task={editing ?? undefined} />
-    </>
-  );
-}
-
-// ------------------------------------------------------------------ kanban
-const KANBAN_COLS: TaskStatus[] = ["todo", "in_progress", "blocked", "done"];
-
-interface DragState {
-  task: Task;
-  x: number;
-  y: number;
-  offX: number;
-  offY: number;
-  width: number;
-  over: TaskStatus | null;
-}
-
-/**
- * Kanban with pointer-based drag & drop (mouse, touch and pen).
- * Mouse: drag the whole card. Touch/pen: drag by the grip handle so normal scrolling still works.
- * Keyboard / no-drag alternative: the status select on each card.
- */
-export function TaskKanban({ tasks, showProject = true, onAdd }: { tasks: Task[]; showProject?: boolean; onAdd?: (s: TaskStatus) => void }) {
-  const [editing, setEditing] = useState<Task | null>(null);
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const suppressClick = useRef(false);
-  const move = useWrite((v: { id: number; status: TaskStatus }) => api.updateTask(v.id, { status: v.status }), { success: (_r, v) => t("Moved to {s}", { s: label(v.status) }) });
-
-  const colAt = (x: number, y: number): TaskStatus | null => {
-    const el = document.elementFromPoint?.(x, y)?.closest<HTMLElement>("[data-kanban-col]");
-    return (el?.dataset.kanbanCol as TaskStatus | undefined) ?? null;
-  };
-
-  const startDrag = (e: React.PointerEvent<HTMLElement>, task: Task, fromHandle: boolean) => {
-    if (e.button !== 0) return;
-    if (e.pointerType !== "mouse" && !fromHandle) return; // touch: only via handle
-    if ((e.target as HTMLElement).closest("select,button:not([data-drag-handle]),a")) return;
-    const card = (e.currentTarget.closest("[data-kanban-card]") as HTMLElement) ?? e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const sx = e.clientX;
-    const sy = e.clientY;
-    let active = fromHandle && e.pointerType !== "mouse";
-    if (active) e.preventDefault();
-    const base = { task, offX: sx - rect.left, offY: sy - rect.top, width: rect.width };
-    if (active) setDrag({ ...base, x: sx, y: sy, over: task.status });
-
-    let raf = 0;
-    let px = sx;
-    let py = sy;
-    // Continuous auto-scroll while the pointer rests near the top/bottom edge (stacked columns on phones).
-    const tick = () => {
-      const edge = 70;
-      const dy = py < edge ? -Math.ceil((edge - py) / 5) : py > window.innerHeight - edge ? Math.ceil((py - window.innerHeight + edge) / 5) : 0;
-      if (dy) {
-        window.scrollBy(0, dy);
-        setDrag((d) => (d ? { ...d, over: colAt(px, py) } : d));
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    if (active) raf = requestAnimationFrame(tick);
-    const onMove = (ev: PointerEvent) => {
-      px = ev.clientX;
-      py = ev.clientY;
-      if (!active) {
-        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
-        active = true;
-        raf = requestAnimationFrame(tick);
-      }
-      ev.preventDefault();
-      setDrag({ ...base, x: ev.clientX, y: ev.clientY, over: colAt(ev.clientX, ev.clientY) });
-    };
-    const finish = (ev: PointerEvent, cancelled: boolean) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-      cancelAnimationFrame(raf);
-      if (active) {
-        suppressClick.current = true;
-        setTimeout(() => (suppressClick.current = false), 0);
-        const target = cancelled ? null : colAt(ev.clientX, ev.clientY);
-        if (target && target !== task.status) move.mutate({ id: task.id, status: target });
-      }
-      setDrag(null);
-    };
-    const onUp = (ev: PointerEvent) => finish(ev, false);
-    const onCancel = (ev: PointerEvent) => finish(ev, true);
-    window.addEventListener("pointermove", onMove, { passive: false });
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-  };
-
-  const cardBody = (task: Task, withHandle: boolean) => (
-    <>
-      <div className="flex items-start gap-1.5">
-        {withHandle && (
-          <button
-            type="button"
-            data-drag-handle
-            aria-label={t("Drag to move")}
-            title={t("Drag to move")}
-            onPointerDown={(e) => { e.stopPropagation(); startDrag(e, task, true); }}
-            onClick={(e) => e.stopPropagation()}
-            className="-ml-1 mt-px cursor-grab touch-none rounded p-0.5 text-muted-foreground/60 hover:bg-accent hover:text-foreground active:cursor-grabbing"
-          >
-            <GripVertical className="size-3.5" />
-          </button>
-        )}
-        <span className="flex-1 text-[13px] font-medium leading-snug">{task.title}</span>
-        <PriorityIcon priority={task.priority} />
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span className="truncate">{showProject ? task.project_title : task.milestone_title ?? ""}</span>
-        {task.due_date && <DueDate date={task.due_date} done={task.status === "done"} className="text-[11px]" />}
-      </div>
-    </>
-  );
-
-  return (
-    <>
-      <div className={cn("grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4", drag && "select-none")}>
-        {KANBAN_COLS.map((s) => {
-          const items = tasks.filter((x) => x.status === s);
-          const isOver = drag?.over === s && drag.task.status !== s;
-          return (
-            <div
-              key={s}
-              data-kanban-col={s}
-              className={cn("flex min-h-48 min-w-0 flex-col rounded-lg border border-transparent bg-muted/65 transition-colors", isOver && "border-primary bg-primary/5")}
-              data-testid={`kanban-${s}`}
-            >
-              <div className="flex min-h-12 items-center justify-between px-3 py-2.5">
-                <div className="flex items-center gap-2 text-xs font-medium"><Badge value={s} dot /><span className="tabular-nums text-muted-foreground">{items.length}</span></div>
-                {onAdd && <Button variant="ghost" size="icon-sm" aria-label={`Add ${label(s)} task`} onClick={() => onAdd(s)}>+</Button>}
-              </div>
-              <div className="flex flex-1 flex-col gap-2 px-2 pb-2">
-                {items.map((task) => (
-                  <div
-                    key={task.id}
-                    data-kanban-card
-                    onPointerDown={(e) => startDrag(e, task, false)}
-                    onClick={() => !suppressClick.current && setEditing(task)}
-                    className={cn("cursor-pointer rounded-md border border-border bg-card p-3 shadow-xs transition-colors hover:border-primary/35", drag?.task.id === task.id && "opacity-40")}
-                  >
-                    {cardBody(task, true)}
-                    <div className="mt-1.5 md:hidden" onClick={(e) => e.stopPropagation()}><TaskStatusSelect task={task} /></div>
-                  </div>
-                ))}
-                {isOver && <div className="h-10 rounded-md border-2 border-dashed border-primary/40" aria-hidden />}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {drag && (
-        <div
-          aria-hidden
-          className="pointer-events-none fixed z-50 rotate-1 rounded-md border border-primary/50 bg-card p-2.5 shadow-xl"
-          style={{ left: drag.x - drag.offX, top: drag.y - drag.offY, width: drag.width }}
-        >
-          {cardBody(drag.task, false)}
-        </div>
-      )}
       <TaskFormDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)} task={editing ?? undefined} />
     </>
   );

@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -89,6 +90,11 @@ class Project(TimestampMixin, Base):
     links: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [{label, url}]
     archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
+    # Manual position in the portfolio (drag to reorder); lower comes first.
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Icon key from the UI icon library (e.g. "flask-conical") and its colour (#rrggbb); "" = default.
+    icon: Mapped[str] = mapped_column(String(40), default="", server_default="")
+    color: Mapped[str] = mapped_column(String(7), default="", server_default="")
 
     milestones: Mapped[list[Milestone]] = relationship(
         back_populates="project", cascade="all, delete-orphan", order_by="Milestone.due_date"
@@ -128,6 +134,8 @@ class Task(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), default="todo", index=True)
     priority: Mapped[str] = mapped_column(String(16), default="medium")
     start_date: Mapped[date | None] = mapped_column(Date)
+    # Position within its Kanban column; fractional so a move only rewrites the moved card.
+    sort_order: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     due_date: Mapped[date | None] = mapped_column(Date, index=True)
     tags: Mapped[list[Any]] = mapped_column(JSON, default=list)
     git_reference: Mapped[str] = mapped_column(String(300), default="")

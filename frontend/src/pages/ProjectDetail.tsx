@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Activity, AlertOctagon, Archive, ArchiveRestore, ArrowLeft, CalendarClock, CheckCircle2, Columns3, ExternalLink, Flag,
+  Activity, AlertOctagon, Archive, ArchiveRestore, ArrowLeft, CalendarClock, ChartGantt, CheckCircle2, Columns3, ExternalLink, Flag,
   FlaskConical, GitBranch, LayoutList, ListTodo, MoreHorizontal, NotebookPen, Pencil, Plus, StickyNote, Target, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,10 @@ import { Badge, Card, CardHeader, EmptyState, ErrorState, ProgressBar, Segmented
 import {
   ConfirmDialog, DropdownContent, DropdownItem, DropdownMenu, DropdownSeparator, DropdownTrigger, Tabs, TabsContent, TabsList, TabsTrigger,
 } from "@/components/ui/overlay";
-import { ActivityList, DueDate, Markdown, TaskKanban, TaskTable } from "@/features/common";
+import { ActivityList, DueDate, Markdown, TaskTable } from "@/features/common";
+import { TaskKanban } from "@/features/kanban";
+import { GanttChart } from "@/features/gantt";
+import { IconPicker } from "@/components/icons/project-icons";
 import { ExperimentRegistry } from "@/features/experiments";
 import { MilestoneFormDialog, ProjectFormDialog } from "@/features/forms";
 import { useAppState } from "@/hooks/app-state";
@@ -20,7 +23,12 @@ import { cn, formatDate, formatDateTime, label, relativeTime } from "@/lib/utils
 import { t } from "@/i18n";
 import { HEALTHS, MILESTONE_STATUSES, PRIORITIES, SOURCES, STAGES, TASK_STATUSES, type Milestone, type Project } from "@/types/api";
 
-const TABS = ["overview", "milestones", "tasks", "experiments", "activity", "notes"] as const;
+const TABS = ["overview", "milestones", "tasks", "gantt", "experiments", "activity", "notes"] as const;
+
+function ProjectIconEditor({ project }: { project: Project }) {
+  const m = useWrite((v: { icon: string; color: string }) => api.updateProject(project.id, { ...v, version: project.version }), { success: "Icon updated" });
+  return <IconPicker icon={project.icon} color={project.color} size="lg" onChange={(v) => m.mutate(v)} />;
+}
 
 function InlineSelect({ project, field, options, ariaLabel }: { project: Project; field: "stage" | "health_status" | "priority"; options: readonly string[]; ariaLabel: string }) {
   const m = useWrite((v: string) => api.updateProject(project.id, { [field]: v, version: project.version } as ProjectInput), {
@@ -248,8 +256,10 @@ export default function ProjectDetailPage() {
       <div className="pb-1">
         <Link to="/projects" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> {t("Projects")}</Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+          <ProjectIconEditor project={p} />
           <div className="min-w-0">
-            <h2 className="text-[22px] font-semibold tracking-tight">{p.title}</h2>
+            <h2 className="text-[22px] font-semibold leading-tight tracking-tight">{p.title}</h2>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span className="font-mono">{p.slug}</span>
               {p.target_venue && <span>{p.target_venue}</span>}
@@ -257,6 +267,7 @@ export default function ProjectDetailPage() {
               <span>{t("Updated {time}", { time: relativeTime(p.updated_at) })}</span>
               {p.archived && <Badge value="archived" text="Archived" />}
             </div>
+          </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => openCreate({ kind: "progress", projectId: p.id })}><NotebookPen /> {t("Log progress")}</Button>
@@ -279,6 +290,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="overview"><Target /> {t("Overview")}</TabsTrigger>
           <TabsTrigger value="milestones"><Flag /> {t("Milestones")} <span className="text-xs text-muted-foreground">{p.milestone_progress.total || ""}</span></TabsTrigger>
           <TabsTrigger value="tasks"><ListTodo /> {t("Tasks")} <span className="text-xs text-muted-foreground">{p.open_task_count || ""}</span></TabsTrigger>
+          <TabsTrigger value="gantt"><ChartGantt /> {t("Gantt")}</TabsTrigger>
           <TabsTrigger value="experiments"><FlaskConical /> {t("Experiments")} <span className="text-xs text-muted-foreground">{p.experiment_count || ""}</span></TabsTrigger>
           <TabsTrigger value="activity"><Activity /> {t("Activity")}</TabsTrigger>
           <TabsTrigger value="notes"><StickyNote /> {t("Notes")}</TabsTrigger>
@@ -286,6 +298,7 @@ export default function ProjectDetailPage() {
         <TabsContent value="overview"><OverviewTab p={p} /></TabsContent>
         <TabsContent value="milestones"><MilestonesTab p={p} /></TabsContent>
         <TabsContent value="tasks"><TasksTab p={p} /></TabsContent>
+        <TabsContent value="gantt"><GanttChart projectId={p.id} /></TabsContent>
         <TabsContent value="experiments"><ExperimentRegistry projectId={p.id} /></TabsContent>
         <TabsContent value="activity"><ActivityTab p={p} /></TabsContent>
         <TabsContent value="notes"><NotesTab p={p} /></TabsContent>

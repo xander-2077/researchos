@@ -32,7 +32,7 @@ def seed_demo(db: Session) -> str:
     specs = [
         dict(
             project=ProjectCreate(
-                title="Humanoid Whole-Body Manipulation", slug="humanoid-wbm",
+                title="Humanoid Whole-Body Manipulation", slug="humanoid-wbm", icon="person-standing", color="#3e63dd",
                 description="[DEMO] Whole-body loco-manipulation for a humanoid with a learned base-compensation controller.",
                 research_question="Can a learned whole-body controller compensate base motion well enough for precise bimanual manipulation?",
                 hypothesis="Adding base-motion compensation to WBC improves end-effector tracking by >30% while walking.",
@@ -48,7 +48,7 @@ def seed_demo(db: Session) -> str:
         ),
         dict(
             project=ProjectCreate(
-                title="Multi-Agent Quadruped Soccer", slug="quadruped-soccer",
+                title="Multi-Agent Quadruped Soccer", slug="quadruped-soccer", icon="goal", color="#30a46c",
                 description="[DEMO] Decentralised multi-agent RL for 2v2 quadruped soccer with a learned world model.",
                 research_question="Does a shared world model improve coordination in decentralised multi-robot soccer?",
                 hypothesis="Agents with a world model score more goals per episode than model-free agents.",
@@ -72,7 +72,7 @@ def seed_demo(db: Session) -> str:
         ),
         dict(
             project=ProjectCreate(
-                title="Humanoid Data Generation", slug="humanoid-datagen",
+                title="Humanoid Data Generation", slug="humanoid-datagen", icon="database", color="#8e4ec6",
                 description="[DEMO] Procedural generation of humanoid manipulation demonstrations.",
                 research_question="Can procedurally generated demos replace part of human teleoperation data?",
                 stage="research_design", priority="medium", next_action="Define task distribution and success metric.",

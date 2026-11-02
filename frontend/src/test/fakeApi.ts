@@ -21,7 +21,7 @@ export function makeProject(over: Json = {}): Json {
   return {
     id, slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-"), title, description: "", research_question: "", hypothesis: "",
     target_venue: "", submission_deadline: null, stage: "ideation", health_status: "on_track", priority: "medium",
-    repository_url: "", next_action: "", blocker_summary: "", notes: "", links: [], archived: false,
+    repository_url: "", next_action: "", blocker_summary: "", notes: "", links: [], archived: false, icon: "", color: "", sort_order: id,
     created_at: new Date().toISOString(), updated_at: new Date().toISOString(), version: 1,
     milestone_progress: { completed: 0, total: 0, percent: null }, next_milestone: null, next_deadline: null,
     open_task_count: 0, blocked_task_count: 0, blocked_tasks: [], experiment_count: 0, last_activity_at: new Date().toISOString(),
@@ -63,6 +63,11 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
       if (q.get("q")) items = items.filter((p) => String(p.title).toLowerCase().includes(q.get("q")!.toLowerCase()));
       return json(page(items));
     }
+    if (path === "/projects/reorder" && method === "POST") {
+      const ids = body!.ids as number[];
+      state.projects.sort((x, y) => ids.indexOf(x.id as number) - ids.indexOf(y.id as number));
+      return json(null, 204);
+    }
     if (path === "/projects" && method === "POST") {
       if (!body?.title) return json({ error: { code: "validation_error", message: "Invalid", details: [{ loc: ["body", "title"], msg: "required" }] } }, 422);
       const p = makeProject(body);
@@ -87,7 +92,7 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     }
     if (path === "/tasks" && method === "POST") {
       const p = state.projects.find((x) => x.id === body!.project_id)!;
-      const t = { id: nextId++, client_key: null, description: "", tags: [], git_reference: "", notes: "", milestone_id: null, start_date: null, due_date: null, depends_on: [],
+      const t = { id: nextId++, client_key: null, description: "", tags: [], git_reference: "", notes: "", milestone_id: null, start_date: null, due_date: null, depends_on: [], sort_order: nextId * 1024,
         created_at: "", updated_at: "", completed_at: null, project_slug: p.slug, project_title: p.title, milestone_title: null, ...body };
       state.tasks.push(t);
       return json(t, 201);
