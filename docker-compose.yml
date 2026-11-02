@@ -1,0 +1,33 @@
+# ResearchOS — single container: web UI + REST API + MCP (Streamable HTTP at /mcp)
+# Start:  cp .env.example .env  (set RESEARCHOS_ADMIN_PASSWORD)  &&  docker compose up -d --build
+services:
+  researchos:
+    build:
+      context: .
+      args:
+        # PyPI mirror used during the image build (set PIP_INDEX_URL in .env to change)
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    image: researchos:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      RESEARCHOS_DATA_DIR: /data
+      # Also read from .env via interpolation (lets `docker compose --env-file other.env` work).
+      RESEARCHOS_ADMIN_PASSWORD: ${RESEARCHOS_ADMIN_PASSWORD:-}
+    # Bound to localhost by default. Expose remotely only via an HTTPS reverse proxy or Tailscale
+    # (see docs/deployment.md). Never publish this port directly to the internet.
+    ports:
+      - "${RESEARCHOS_BIND:-127.0.0.1}:${RESEARCHOS_PORT:-8000}:8000"
+    volumes:
+      - researchos-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  researchos-data:
+    name: ${RESEARCHOS_VOLUME:-researchos-data}

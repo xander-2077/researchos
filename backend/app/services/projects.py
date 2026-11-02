@@ -1,0 +1,301 @@
+"""Project service: CRUD, portfolio summaries, high-impact change guards."""
+
+from __future__ import annotations
+
+import re
+from collections import defaultdict
+from datetime import date
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.auth.actor import Actor
+from app.core.enums import OPEN_MILESTONE_STATUSES, OPEN_TASK_STATUSES, PRIORITY_RANK
+from app.core.errors import ConfirmationRequired, Conflict, NotFound, ValidationFailed
+from app.models import Experiment, Milestone, ProgressEvent, Project, Task
+from app.repositories.base import apply_sort, clamp_limit
+from app.schemas.entities import ProjectCreate, ProjectUpdate
+from app.services.activity import log_event
+
+SORTABLE = {"title", "stage", "priority", "health_status", "submission_deadline", "updated_at", "created_at"}
+HIGH_IMPACT_FIELDS = {"research_question", "hypothesis"}
+STAGE_LABEL = {
+    "ideation": "Ideation",
+    "research_design": "Research Design",
+    "implementation": "Implementation",
+    "experimentation": "Experimentation",
+    "analysis": "Analysis",
+    "writing": "Writing",
+    "submission": "Submission",
+    "revision": "Revision",
+    "completed": "Completed",
+    "on_hold": "On Hold",
+}
+
+
+def slugify(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return (s or "project")[:70].strip("-")
+
+
+def _unique_slug(db: Session, base: str) -> str:
+    slug, n = base, 2
+    while db.scalar(select(Project.id).where(Project.slug == slug)) is not None:
+        slug = f"{base}-{n}"
+        n += 1
+    return slug
+
+
+def resolve_project(db: Session, ref: int | str) -> Project:
+    """Find a project by numeric id or slug."""
+    project: Project | None = None
+    if isinstance(ref, int) or (isinstance(ref, str) and ref.isdigit()):
+        project = db.get(Project, int(ref))
+    if project is None and isinstance(ref, str):
+        project = db.scalar(select(Project).where(Project.slug == ref.strip().lower()))
+    if project is None:
+        raise NotFound(
+            f"Project '{ref}' not found. Use list_projects (MCP) or GET /api/v1/projects to see valid ids/slugs."
+        )
+    return project
+
+
+def create_project(db: Session, actor: Actor, data: ProjectCreate) -> Project:
+    actor.require_write()
+    payload = data.model_dump()
+    slug = payload.pop("slug") or _unique_slug(db, slugify(data.title))
+    if db.scalar(select(Project.id).where(Project.slug == slug)) is not None:
+        raise Conflict(f"Slug '{slug}' is already used by another project")
+    payload["links"] = [link for link in payload["links"]]
+    project = Project(slug=slug, **payload)
+    db.add(project)
+    db.flush()
+    log_event(
+        db, actor, project_id=project.id, event_type="project_created",
+        summary=f"Project created: {project.title}", resource_type="project", resource_id=project.id,
+    )
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+def update_project(db: Session, actor: Actor, project_id: int, data: ProjectUpdate) -> Project:
+    actor.require_write()
+    project = db.get(Project, project_id)
+    if project is None:
+        raise NotFound(f"Project {project_id} not found")
+    changes = data.model_dump(exclude_unset=True)
+    confirm = changes.pop("confirm", False)
+    expected_version = changes.pop("version", None)
+    if expected_version is not None and expected_version != project.version:
+        raise Conflict(
+            "Project was modified by someone else. Reload and retry.",
+            details={"current_version": project.version},
+        )
+    # Drop no-op changes so we only log real edits.
+    changes = {k: v for k, v in changes.items() if getattr(project, k) != v}
+    if "links" in changes:
+        changes["links"] = [dict(link) for link in changes["links"] or []]
+    if not changes:
+        return project
+
+    if actor.is_agent and not confirm:
+        risky = []
+        if changes.get("stage") == "completed":
+            risky.append("stage=completed")
+        if changes.get("archived") is True:
+            risky.append("archived=true")
+        risky += [f for f in HIGH_IMPACT_FIELDS if f in changes and getattr(project, f)]
+        if risky:
+            raise ConfirmationRequired(
+                "High-impact change requires explicit confirmation: "
+                + ", ".join(risky)
+                + ". Ask the user, then retry with confirm=true.",
+                details={"fields": risky},
+            )
+    if "slug" in changes:
+        if db.scalar(select(Project.id).where(Project.slug == changes["slug"], Project.id != project.id)):
+            raise Conflict(f"Slug '{changes['slug']}' is already in use")
+
+    old_stage, old_health = project.stage, project.health_status
+    for k, v in changes.items():
+        setattr(project, k, v)
+    project.version += 1
+
+    if "stage" in changes:
+        log_event(
+            db, actor, project_id=project.id, event_type="stage_changed",
+            summary=f"Stage changed: {STAGE_LABEL[old_stage]} → {STAGE_LABEL[project.stage]}",
+            resource_type="project", resource_id=project.id,
+        )
+    if "health_status" in changes:
+        log_event(
+            db, actor, project_id=project.id, event_type="health_changed",
+            summary=f"Health changed: {old_health} → {project.health_status}",
+            resource_type="project", resource_id=project.id,
+        )
+    if "archived" in changes:
+        log_event(
+            db, actor, project_id=project.id,
+            event_type="project_archived" if project.archived else "project_restored",
+            summary=("Project archived" if project.archived else "Project restored"),
+            resource_type="project", resource_id=project.id,
+        )
+    other = sorted(set(changes) - {"stage", "health_status", "archived", "notes"})
+    if other:
+        log_event(
+            db, actor, project_id=project.id, event_type="project_updated",
+            summary=f"Project updated: {', '.join(other)}", resource_type="project", resource_id=project.id,
+        )
+    try:
+        db.commit()
+    except IntegrityError as e:  # pragma: no cover - race on slug
+        db.rollback()
+        raise Conflict("Update violates a uniqueness constraint") from e
+    db.refresh(project)
+    return project
+
+
+def archive_project(db: Session, actor: Actor, project_id: int) -> Project:
+    """Soft delete."""
+    return update_project(db, actor, project_id, ProjectUpdate(archived=True, confirm=True))
+
+
+# ------------------------------------------------------------------ summaries
+def _summaries(db: Session, projects: list[Project]) -> list[dict[str, Any]]:
+    ids = [p.id for p in projects]
+    if not ids:
+        return []
+    today = date.today()
+
+    ms_by_p: dict[int, list[Milestone]] = defaultdict(list)
+    for m in db.scalars(select(Milestone).where(Milestone.project_id.in_(ids))):
+        ms_by_p[m.project_id].append(m)
+
+    open_tasks: dict[int, list[Task]] = defaultdict(list)
+    for t in db.scalars(
+        select(Task).where(Task.project_id.in_(ids), Task.status.in_(OPEN_TASK_STATUSES))
+    ):
+        open_tasks[t.project_id].append(t)
+
+    exp_counts = dict(
+        db.execute(
+            select(Experiment.project_id, func.count()).where(Experiment.project_id.in_(ids)).group_by(Experiment.project_id)
+        ).all()
+    )
+    last_act = dict(
+        db.execute(
+            select(ProgressEvent.project_id, func.max(ProgressEvent.created_at))
+            .where(ProgressEvent.project_id.in_(ids))
+            .group_by(ProgressEvent.project_id)
+        ).all()
+    )
+
+    out = []
+    for p in projects:
+        ms = [m for m in ms_by_p[p.id] if m.status != "cancelled"]
+        done = sum(1 for m in ms if m.status == "completed")
+        open_ms = sorted(
+            (m for m in ms if m.status in OPEN_MILESTONE_STATUSES),
+            key=lambda m: (m.due_date is None, m.due_date or date.max, m.id),
+        )
+        nm = open_ms[0] if open_ms else None
+
+        candidates: list[tuple[date, dict[str, Any]]] = []
+        if p.submission_deadline and p.submission_deadline >= today:
+            candidates.append((p.submission_deadline, {"kind": "submission", "title": p.target_venue or "Submission", "due_date": p.submission_deadline}))
+        for m in open_ms:
+            if m.due_date and m.due_date >= today:
+                candidates.append((m.due_date, {"kind": "milestone", "id": m.id, "title": m.title, "due_date": m.due_date}))
+        for t in open_tasks[p.id]:
+            if t.due_date and t.due_date >= today:
+                candidates.append((t.due_date, {"kind": "task", "id": t.id, "title": t.title, "due_date": t.due_date}))
+        candidates.sort(key=lambda c: c[0])
+
+        blocked = [t.title for t in open_tasks[p.id] if t.status == "blocked"]
+        ev_last = last_act.get(p.id)
+        if ev_last is not None and ev_last.tzinfo is None:
+            from datetime import timezone
+
+            ev_last = ev_last.replace(tzinfo=timezone.utc)
+        last = max(x for x in [ev_last, p.updated_at] if x is not None)
+        d = {c.name: getattr(p, c.name) for c in Project.__table__.columns}
+        d.update(
+            milestone_progress={
+                "completed": done,
+                "total": len(ms),
+                "percent": round(100 * done / len(ms), 1) if ms else None,
+            },
+            next_milestone=(
+                {"id": nm.id, "title": nm.title, "due_date": nm.due_date, "status": nm.status} if nm else None
+            ),
+            next_deadline=candidates[0][1] if candidates else None,
+            open_task_count=len(open_tasks[p.id]),
+            blocked_task_count=len(blocked),
+            blocked_tasks=blocked[:5],
+            experiment_count=exp_counts.get(p.id, 0),
+            last_activity_at=last,
+        )
+        out.append(d)
+    return out
+
+
+def list_projects(
+    db: Session,
+    actor: Actor,
+    *,
+    stage: str | None = None,
+    health_status: str | None = None,
+    priority: str | None = None,
+    archived: bool | None = False,
+    q: str | None = None,
+    sort: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> tuple[list[dict[str, Any]], int, int, int]:
+    actor.require_read()
+    stmt = select(Project)
+    if archived is not None:
+        stmt = stmt.where(Project.archived == archived)
+    for col, val in ((Project.stage, stage), (Project.health_status, health_status), (Project.priority, priority)):
+        if val:
+            stmt = stmt.where(col.in_(val.split(",")))
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(
+            Project.title.ilike(like) | Project.description.ilike(like) | Project.slug.ilike(like)
+        )
+    sort_key = sort or "priority"
+    # priority / deadline / last_activity need custom ordering, done in Python (small N).
+    python_sort = sort_key.lstrip("-") in {"priority", "next_deadline", "last_activity"}
+    if not python_sort:
+        stmt = apply_sort(stmt, Project, sort_key, SORTABLE, "-updated_at")
+    projects = list(db.scalars(stmt))
+    summaries = _summaries(db, projects)
+    if python_sort:
+        desc = sort_key.startswith("-")
+        key = sort_key.lstrip("-")
+        if key == "priority":
+            summaries.sort(key=lambda s: (PRIORITY_RANK.get(s["priority"], 9), s["title"].lower()), reverse=desc)
+        elif key == "next_deadline":
+            summaries.sort(key=lambda s: (s["next_deadline"] is None, s["next_deadline"]["due_date"] if s["next_deadline"] else date.max), reverse=desc)
+        else:
+            summaries.sort(key=lambda s: s["last_activity_at"], reverse=not desc)
+    total = len(summaries)
+    lim = clamp_limit(limit)
+    off = max(0, offset or 0)
+    return summaries[off : off + lim], total, lim, off
+
+
+def project_summary(db: Session, project: Project) -> dict[str, Any]:
+    return _summaries(db, [project])[0]
+
+
+def validate_milestone_belongs(db: Session, project_id: int, milestone_id: int | None) -> None:
+    if milestone_id is None:
+        return
+    m = db.get(Milestone, milestone_id)
+    if m is None or m.project_id != project_id:
+        raise ValidationFailed(f"Milestone {milestone_id} does not belong to project {project_id}")

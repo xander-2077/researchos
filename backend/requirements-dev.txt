@@ -1,0 +1,6 @@
+-r requirements.lock
+pytest==9.2.0
+pytest-asyncio==1.4.1.post1
+httpx==0.28.1
+# optional: browser end-to-end test (scripts/e2e_acceptance.py)
+playwright

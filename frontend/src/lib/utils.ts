@@ -1,0 +1,136 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export const LABELS: Record<string, string> = {
+  // stages
+  ideation: "Ideation", research_design: "Research Design", implementation: "Implementation",
+  experimentation: "Experimentation", analysis: "Analysis", writing: "Writing", submission: "Submission",
+  revision: "Revision", completed: "Completed", on_hold: "On Hold",
+  // health
+  on_track: "On Track", at_risk: "At Risk", blocked: "Blocked",
+  // priority
+  critical: "Critical", high: "High", medium: "Medium", low: "Low",
+  // task / milestone / experiment / run status
+  todo: "Todo", in_progress: "In Progress", done: "Done", cancelled: "Cancelled", planned: "Planned",
+  running: "Running", analyzing: "Analyzing", needs_review: "Needs Review", verified: "Verified",
+  failed: "Failed", unverified: "Unverified", rejected: "Rejected",
+  // experiment types
+  main: "Main", ablation: "Ablation", baseline: "Baseline", sweep: "Sweep", sanity_check: "Sanity check", other: "Other",
+  // sources
+  manual: "Manual", claude_code: "Claude Code", codex: "Codex", rest_api: "REST API", mcp: "MCP agent", system: "System",
+  // deadline kinds
+  milestone: "Milestone", task: "Task", archived: "Archived",
+};
+
+export const label = (v: string | null | undefined) => (v ? LABELS[v] ?? v.replace(/_/g, " ") : "—");
+
+type Tone = "neutral" | "blue" | "green" | "amber" | "red" | "violet" | "slate";
+
+export const TONE_CLASSES: Record<Tone, string> = {
+  neutral: "bg-muted text-muted-foreground border-border",
+  slate: "bg-muted text-foreground/80 border-border",
+  blue: "bg-info/10 text-info border-info/25",
+  green: "bg-success/10 text-success border-success/25",
+  amber: "bg-warning/12 text-[color-mix(in_oklch,var(--warning)_75%,var(--foreground))] border-warning/30",
+  red: "bg-danger/10 text-danger border-danger/25",
+  violet: "bg-primary/10 text-primary border-primary/25",
+};
+
+export const TONES: Record<string, Tone> = {
+  on_track: "green", at_risk: "amber", blocked: "red",
+  critical: "red", high: "amber", medium: "blue", low: "neutral",
+  todo: "neutral", in_progress: "blue", done: "green", cancelled: "neutral",
+  planned: "neutral", completed: "green",
+  running: "blue", analyzing: "violet", needs_review: "amber", verified: "green", failed: "red",
+  unverified: "neutral", rejected: "red",
+  ideation: "slate", research_design: "slate", implementation: "blue", experimentation: "violet",
+  analysis: "violet", writing: "amber", submission: "amber", revision: "amber", on_hold: "neutral",
+  manual: "slate", claude_code: "amber", codex: "green", rest_api: "blue", mcp: "violet", system: "neutral",
+  submission_kind: "red",
+};
+
+export const tone = (v: string | null | undefined): Tone => (v ? TONES[v] ?? "neutral" : "neutral");
+
+// ------------------------------------------------------------- dates (UTC stored, local display)
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Today's date (local) as YYYY-MM-DD. */
+export function todayISO(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Parse a YYYY-MM-DD as a *local* calendar date. */
+export function parseDate(s: string): Date {
+  const [y, m, d] = s.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export function daysUntil(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const t = parseDate(todayISO()).getTime();
+  return Math.round((parseDate(s).getTime() - t) / 86400000);
+}
+
+export function formatDate(s: string | null | undefined, opts: { withYear?: boolean } = {}): string {
+  if (!s) return "—";
+  const d = parseDate(s);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, {
+    month: "short", day: "numeric", ...(opts.withYear || !sameYear ? { year: "numeric" } : {}),
+  });
+}
+
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+export function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const abs = Math.abs(diff);
+  if (abs < 60) return "just now";
+  if (abs < 3600) return rtf.format(-Math.round(diff / 60), "minute");
+  if (abs < 86400) return rtf.format(-Math.round(diff / 3600), "hour");
+  if (abs < 86400 * 30) return rtf.format(-Math.round(diff / 86400), "day");
+  return formatDate(iso.slice(0, 10), { withYear: true });
+}
+
+export function dueLabel(s: string | null | undefined): string {
+  const n = daysUntil(s);
+  if (n === null) return "";
+  if (n === 0) return "today";
+  if (n === 1) return "tomorrow";
+  if (n === -1) return "yesterday";
+  return n < 0 ? `${-n}d overdue` : `in ${n}d`;
+}
+
+export function formatNumber(v: number | null | undefined, digits = 3): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  if (Number.isInteger(v)) return v.toLocaleString();
+  const abs = Math.abs(v);
+  if (abs !== 0 && (abs < 1e-3 || abs >= 1e6)) return v.toExponential(2);
+  return Number(v.toPrecision(digits + (abs >= 1 ? Math.floor(Math.log10(abs)) : 0))).toLocaleString(undefined, {
+    maximumFractionDigits: 4,
+  });
+}
+
+export function startOfWeekISO(): string {
+  const d = new Date();
+  const day = (d.getDay() + 6) % 7; // Monday=0
+  d.setDate(d.getDate() - day);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function shortSha(sha: string | null | undefined): string {
+  return sha ? sha.slice(0, 8) : "";
+}

@@ -1,0 +1,62 @@
+import { useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/form";
+import { useAuth } from "@/hooks/auth";
+import { ApiError } from "@/services/api";
+
+export default function LoginPage({ setupRequired }: { setupRequired?: boolean }) {
+  const { login } = useAuth();
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!username || !password) {
+      setError("Enter username and password");
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    try {
+      await login(username, password);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Login failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex items-center justify-center gap-2">
+          <img src="/favicon.svg" alt="" className="size-8" />
+          <span className="text-lg font-semibold tracking-tight">ResearchOS</span>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          {setupRequired ? (
+            <div className="space-y-3 text-[13px]">
+              <h1 className="text-base font-semibold">Create the admin account</h1>
+              <p className="text-muted-foreground">No admin user exists yet. For security this is done on the server, not in the browser:</p>
+              <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{`# Docker
+docker compose exec researchos python -m app.cli set-password
+
+# or set RESEARCHOS_ADMIN_PASSWORD in .env and restart`}</pre>
+              <Button variant="secondary" onClick={() => window.location.reload()}>I’ve done this — reload</Button>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="space-y-4" noValidate>
+              <h1 className="text-base font-semibold">Sign in</h1>
+              <Field label="Username">{(id) => <Input id={id} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />}</Field>
+              <Field label="Password" error={error}>{(id) => <Input id={id} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />}</Field>
+              <Button type="submit" className="w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
+            </form>
+          )}
+        </div>
+        <p className="mt-4 text-center text-xs text-muted-foreground">Self-hosted research portfolio · REST · MCP</p>
+      </div>
+    </div>
+  );
+}
