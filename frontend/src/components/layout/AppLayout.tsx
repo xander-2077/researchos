@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, CalendarRange, ChevronsLeft, ChevronsRight, FlaskConical, FolderKanban, LayoutDashboard, ListTodo,
+  Activity, BookOpen, CalendarRange, LifeBuoy, ChevronsLeft, ChevronsRight, FlaskConical, FolderKanban, LayoutDashboard, ListTodo,
   Languages, LogOut, Menu, Monitor, Moon, NotebookPen, Plus, Search, Settings, Sun, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,12 @@ const NAV = [
   { to: "/timeline", label: "Timeline", icon: CalendarRange },
   { to: "/activity", label: "Activity", icon: Activity },
   { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/help", label: "Help", icon: BookOpen },
 ];
 
 const TITLES: Record<string, string> = {
   "": "Portfolio Overview", projects: "Projects", experiments: "Experiment Registry", tasks: "Tasks",
-  timeline: "Timeline & Deadlines", activity: "Activity", settings: "Settings",
+  timeline: "Timeline & Deadlines", activity: "Activity", settings: "Settings", help: "Help",
 };
 
 function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
@@ -236,6 +237,7 @@ function NewMenu() {
 
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
   const loc = useLocation();
   const section = loc.pathname.split("/")[1] ?? "";
   const title = TITLES[section] ? t(TITLES[section]) : "ResearchOS";
@@ -255,11 +257,14 @@ export function AppLayout() {
           <div className="flex flex-1 justify-center px-2"><GlobalSearch /></div>
           {showProjectFilter && <ProjectFilter />}
           <NewMenu />
+          <Button variant="ghost" size="icon" aria-label={t("Help")} title={t("Help")} onClick={() => navigate("/help")} className="hidden sm:inline-flex"><LifeBuoy /></Button>
           <LanguageToggle />
           <ThemeToggle />
         </header>
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-3 py-5 md:px-6">
-          <Outlet />
+          <Suspense fallback={<div className="flex justify-center py-16"><Spinner /></div>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
       <CreateDialogHost />

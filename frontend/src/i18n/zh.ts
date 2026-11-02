@@ -36,6 +36,23 @@ export const zh: Record<string, string> = {
   "just now": "刚刚", today: "今天", tomorrow: "明天", yesterday: "昨天", "{n}d overdue": "逾期 {n} 天", "in {n}d": "{n} 天后",
   "{p} priority": "{p}优先级", "Updated {time}": "更新于 {time}", "Load more ({n})": "加载更多（{n}）",
   "Cannot reach the ResearchOS server": "无法连接 ResearchOS 服务器",
+  // common API errors (shown in toasts / forms)
+  "Not authenticated": "未登录", "Session expired": "会话已过期，请重新登录", "Invalid request": "请求无效",
+  "Missing or invalid CSRF token": "安全校验失败，请刷新页面后重试", "Current password is incorrect": "当前密码不正确",
+  "Password must be at least 10 characters": "密码至少需要 10 个字符", "Too many requests; slow down": "请求过于频繁，请稍后再试",
+  "Too many login attempts; wait a minute": "登录尝试过多，请一分钟后再试",
+  "Project was modified by someone else. Reload and retry.": "项目已被其他人修改，请刷新后重试。",
+  "Experiments can only be deleted from the web UI.": "实验只能在网页界面中删除。", "Internal server error": "服务器内部错误",
+  // views added later
+  View: "视图", Calendar: "日历", "Previous month": "上个月", "Next month": "下个月", "+{n} more": "还有 {n} 项",
+  "Click a day to see its items": "点击日期查看当日事项",
+  Help: "帮助", Documentation: "文档", "User guide": "使用指南", "MCP integration": "MCP 集成", Deployment: "部署",
+  Architecture: "架构", "CLAUDE.md template": "CLAUDE.md 模板", "AGENTS.md template": "AGENTS.md 模板",
+  "REST API reference": "REST API 参考", "On this page": "本页目录", "Template copied": "模板已复制",
+  "Copy this file into the root of your research repository and set the project slug.": "把此文件复制到科研仓库根目录，并填写项目短标识。",
+  "This reference document is in English. A Chinese quick guide is available:": "此参考文档为英文，中文快速指南请见：",
+  "Project-scoped config, stdio mode, tool reference and the AGENTS.md / CLAUDE.md templates:": "项目级配置、stdio 模式、工具说明以及 AGENTS.md / CLAUDE.md 模板：",
+  "MCP integration guide": "MCP 集成指南", "Nothing due on this day": "当天没有到期事项", "Drag to move": "拖动以移动",
 
   // ---------------------------------------------------------------- overview / portfolio
   "Active Projects": "进行中项目", "Open Tasks": "未完成任务", "Running Experiments": "运行中实验",

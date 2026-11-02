@@ -11,6 +11,8 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
   server: {
     port: 5173,
+    // docs/ and templates/ live one level up and are bundled into the Help page
+    fs: { allow: [".."] },
     proxy: { "/api": backend, "/mcp": backend },
   },
   build: { outDir: "dist", sourcemap: false, chunkSizeWarningLimit: 1200 },

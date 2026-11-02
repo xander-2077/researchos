@@ -317,3 +317,14 @@ def test_project_routes_accept_slug(ctx: Ctx):
     assert len(ctx.client.get("/api/v1/projects/humanoid-wbm/milestones", headers=ctx.ro).json()) == 1
     assert ctx.client.get("/api/v1/projects/humanoid-wbm/progress", headers=ctx.ro).json()["total"] >= 2
     assert ctx.client.get("/api/v1/projects/nope/progress", headers=ctx.ro).status_code == 404
+
+
+def test_deadlines_explicit_range(ctx: Ctx):
+    p = mkproject(ctx, "Cal")
+    for n in (-40, -5, 3, 50):
+        ctx.client.post("/api/v1/tasks", json={"project_id": p["id"], "title": f"t{n}", "due_date": d(n)}, headers=ctx.rw)
+    r = ctx.client.get(f"/api/v1/dashboard/deadlines?start={d(-45)}&end={d(-1)}", headers=ctx.ro).json()
+    assert [x["title"] for x in r] == ["t-40", "t-5"]
+    r = ctx.client.get(f"/api/v1/dashboard/deadlines?start={d(0)}&end={d(60)}", headers=ctx.ro).json()
+    assert [x["title"] for x in r] == ["t3", "t50"]
+    assert ctx.client.get(f"/api/v1/dashboard/deadlines?start={d(5)}&end={d(1)}", headers=ctx.ro).status_code == 422

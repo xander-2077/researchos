@@ -6,15 +6,20 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorState, Spinner } from "@/components/ui/misc";
 import { AppStateProvider, useAppState } from "@/hooks/app-state";
 import { AuthProvider, useAuth } from "@/hooks/auth";
-import ActivityPage from "@/pages/Activity";
-import ExperimentsPage, { ExperimentDetailPage } from "@/pages/Experiments";
 import LoginPage from "@/pages/Login";
-import OverviewPage from "@/pages/Overview";
-import ProjectDetailPage from "@/pages/ProjectDetail";
-import ProjectsPage from "@/pages/Projects";
-import SettingsPage from "@/pages/Settings";
-import TasksPage from "@/pages/Tasks";
-import TimelinePage from "@/pages/Timeline";
+import { lazy } from "react";
+
+// Route-level code splitting: each page is its own chunk.
+const OverviewPage = lazy(() => import("@/pages/Overview"));
+const ProjectsPage = lazy(() => import("@/pages/Projects"));
+const ProjectDetailPage = lazy(() => import("@/pages/ProjectDetail"));
+const ExperimentsPage = lazy(() => import("@/pages/Experiments"));
+const ExperimentDetailPage = lazy(() => import("@/pages/Experiments").then((m) => ({ default: m.ExperimentDetailPage })));
+const TasksPage = lazy(() => import("@/pages/Tasks"));
+const TimelinePage = lazy(() => import("@/pages/Timeline"));
+const ActivityPage = lazy(() => import("@/pages/Activity"));
+const SettingsPage = lazy(() => import("@/pages/Settings"));
+const HelpPage = lazy(() => import("@/pages/Help"));
 import { ApiError } from "@/services/api";
 import { EmptyState } from "@/components/ui/misc";
 import { Link } from "react-router-dom";
@@ -59,6 +64,8 @@ function Gate() {
             <Route path="timeline" element={<TimelinePage />} />
             <Route path="activity" element={<ActivityPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="help" element={<HelpPage />} />
+            <Route path="help/:doc" element={<HelpPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

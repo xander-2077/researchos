@@ -154,7 +154,9 @@ def dashboard_summary(horizon_days: int = Query(14, ge=1, le=365), actor: Actor 
 
 @router.get("/dashboard/deadlines", response_model=list[DeadlineItem], tags=["dashboard"])
 def dashboard_deadlines(
-    days: int = Query(30, ge=1, le=730, description="Look-ahead window in days"),
+    days: int = Query(30, ge=1, le=730, description="Look-ahead window in days (ignored when start/end given)"),
+    start: date | None = Query(None, description="Explicit range start (inclusive), e.g. for a calendar month"),
+    end: date | None = Query(None, description="Explicit range end (inclusive)"),
     include_overdue: bool = True,
     project_id: int | None = None,
     kinds: str = Query("submission,milestone,task"),
@@ -163,6 +165,16 @@ def dashboard_deadlines(
     db: Session = Depends(get_db),
 ):
     today = date.today()
+    if start or end:
+        lo, hi = start or today, end or (start or today) + timedelta(days=days)
+        if hi < lo or (hi - lo).days > 731:
+            from app.core.errors import ValidationFailed
+
+            raise ValidationFailed("end must be on/after start and the range at most ~2 years")
+        return dash_svc.deadlines_between(
+            db, actor, lo, hi, include_overdue=False, project_id=project_id,
+            kinds=tuple(k for k in kinds.split(",") if k), limit=limit,
+        )
     return dash_svc.deadlines_between(
         db, actor, today, today + timedelta(days=days), include_overdue=include_overdue,
         project_id=project_id, kinds=tuple(k for k in kinds.split(",") if k), limit=limit,

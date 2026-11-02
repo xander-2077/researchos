@@ -1,5 +1,7 @@
 # ResearchOS — single container: web UI + REST API + MCP (Streamable HTTP at /mcp)
 # Start:  cp .env.example .env  (set RESEARCHOS_ADMIN_PASSWORD)  &&  docker compose up -d --build
+# Remote access over Tailscale (optional):  docker compose --profile tailscale up -d
+#   → https://<TS_HOSTNAME>.<your-tailnet>.ts.net   (see docs/deployment.md#option-a--tailscale-serve-docker-sidecar)
 services:
   researchos:
     build:
@@ -28,6 +30,30 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # Optional Tailscale sidecar: joins your tailnet as its own machine and uses Tailscale Serve to
+  # publish ResearchOS over HTTPS *only inside the tailnet*. Userspace networking: no root,
+  # no /dev/net/tun, no host network changes. Enabled with `--profile tailscale`
+  # (or COMPOSE_PROFILES=tailscale in .env).
+  tailscale:
+    image: tailscale/tailscale:v1.104.4
+    profiles: ["tailscale"]
+    hostname: ${TS_HOSTNAME:-researchos}
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/config/entrypoint.sh"]
+    environment:
+      TS_HOSTNAME: ${TS_HOSTNAME:-researchos}
+      # Optional: a pre-auth key from https://login.tailscale.com/admin/settings/keys
+      # If empty, `docker compose logs tailscale` prints a login URL to open once.
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:-}
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./docker/tailscale/entrypoint.sh:/config/entrypoint.sh:ro
+    depends_on:
+      - researchos
+
 volumes:
   researchos-data:
     name: ${RESEARCHOS_VOLUME:-researchos-data}
+  tailscale-state:
+    name: ${TS_STATE_VOLUME:-researchos-tailscale-state}

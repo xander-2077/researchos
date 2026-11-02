@@ -34,8 +34,20 @@ docker compose up -d --build
 ```
 
 Open **http://127.0.0.1:8000** and sign in as `admin` with that password.
-The service listens on localhost only; see [docs/deployment.md](docs/deployment.md) for
-HTTPS reverse proxy and Tailscale setups on a VPS.
+The service listens on localhost only. For private remote access from your laptop/phone, enable
+the bundled Tailscale sidecar (HTTPS inside your tailnet, no open ports):
+
+```bash
+docker compose --profile tailscale up -d
+docker compose logs tailscale | grep -A1 "To authenticate"   # approve once
+# → https://researchos.<your-tailnet>.ts.net
+```
+
+See [docs/deployment.md](docs/deployment.md) for details, Caddy/nginx and VPS setups.
+
+**In-app help:** the **Help** page (sidebar, or the lifebuoy icon in the header) shows the user
+guide (English / 简体中文), MCP integration, deployment, architecture and the CLAUDE.md /
+AGENTS.md templates with copy/download buttons.
 
 Optional demo data (three fictional projects): `docker compose exec researchos python -m app.cli seed-demo`
 (only works on an empty database).
@@ -119,6 +131,8 @@ JSON export: *Settings → Export JSON* or `GET /api/v1/export`. Details and cro
 [docs/deployment.md](docs/deployment.md#5-backup--restore).
 
 ## Upgrading / database migrations
+
+After any code change (or `git pull`): `scripts/update.sh` (backup → `docker compose up -d --build` → wait until healthy).
 
 ```bash
 scripts/backup.sh

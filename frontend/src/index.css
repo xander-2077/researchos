@@ -117,3 +117,16 @@
 .prose-ros blockquote { border-left: 3px solid var(--border); padding-left: 0.75rem; color: var(--muted-foreground); }
 .prose-ros table { border-collapse: collapse; margin: 0.5rem 0; }
 .prose-ros th, .prose-ros td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; }
+
+/* Help / documentation pages */
+.prose-help h1 { font-size: 1.6rem; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 1rem; }
+.prose-help h2 { font-size: 1.2rem; font-weight: 600; margin: 2rem 0 0.6rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.prose-help h3 { font-size: 1.02rem; font-weight: 600; margin: 1.4rem 0 0.4rem; }
+.prose-help p, .prose-help li { line-height: 1.7; }
+.prose-help table { font-size: 13px; width: 100%; }
+.prose-help th { background: var(--muted); text-align: left; }
+.prose-help pre { font-size: 12.5px; line-height: 1.55; margin: 0.6rem 0; }
+.prose-help blockquote { margin: 0.75rem 0; }
+.prose-help hr { border-color: var(--border); margin: 1.5rem 0; }
+.prose-help :is(h1, h2, h3, h4) > a[aria-hidden] { opacity: 0; text-decoration: none; color: var(--muted-foreground); transition: opacity 0.15s; }
+.prose-help :is(h1, h2, h3, h4):hover > a[aria-hidden] { opacity: 1; }

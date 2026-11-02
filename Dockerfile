@@ -4,6 +4,9 @@ WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+# The in-app Help page bundles these Markdown files (imported as ../../../docs from src/pages)
+COPY docs /docs
+COPY templates /templates
 RUN npm run build
 
 # ---------- 2) runtime: FastAPI serves API + MCP + static UI ----------

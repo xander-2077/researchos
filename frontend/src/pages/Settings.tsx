@@ -9,6 +9,7 @@ import { useAppState, type Theme } from "@/hooks/app-state";
 import { useTokens, useWrite } from "@/hooks/queries";
 import { api, ApiError } from "@/services/api";
 import { formatDateTime, relativeTime } from "@/lib/utils";
+import { Link } from "react-router-dom";
 import type { ApiToken } from "@/types/api";
 import { LANGS, t, useI18n } from "@/i18n";
 
@@ -135,7 +136,10 @@ bearer_token_env_var = "RESEARCHOS_TOKEN"
       <CardHeader title="Connect an agent (MCP)" sub={t("Streamable HTTP endpoint: {url}", { url: `${origin}/mcp` })} action={<Segmented ariaLabel={t("Client")} value={client} onChange={setClient} options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }]} />} />
       <div className="space-y-2 p-4">
         <Code>{client === "claude" ? claude : codex}</Code>
-        <p className="text-xs text-muted-foreground">{t("See docs/mcp-integration.md for project-scoped config, stdio mode and the AGENTS.md / CLAUDE.md templates.")}</p>
+        <p className="text-xs text-muted-foreground">{t("Project-scoped config, stdio mode, tool reference and the AGENTS.md / CLAUDE.md templates:")}{" "}
+          <Link to="/help/mcp-integration" className="text-primary hover:underline">{t("MCP integration guide")}</Link>
+          {" · "}<Link to="/help/claude-template" className="text-primary hover:underline">CLAUDE.md</Link>
+          {" · "}<Link to="/help/agents-template" className="text-primary hover:underline">AGENTS.md</Link></p>
       </div>
     </Card>
   );

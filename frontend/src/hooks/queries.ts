@@ -20,8 +20,8 @@ export const useExperiment = (id: number | undefined) =>
   useQuery({ queryKey: ["experiment", id], queryFn: () => api.experiment(id!), enabled: !!id });
 export const useActivity = (q: Q = {}) =>
   useQuery({ queryKey: ["activity", q], queryFn: () => api.activity(q), placeholderData: keepPreviousData });
-export const useDeadlines = (q: Q = {}) =>
-  useQuery({ queryKey: ["deadlines", q], queryFn: () => api.deadlines(q), placeholderData: keepPreviousData });
+export const useDeadlines = (q: Q = {}, enabled = true) =>
+  useQuery({ queryKey: ["deadlines", q], queryFn: () => api.deadlines(q), placeholderData: keepPreviousData, enabled });
 export const useNeedsReview = () => useQuery({ queryKey: ["needsReview"], queryFn: () => api.needsReview(8) });
 export const useTokens = () => useQuery({ queryKey: ["tokens"], queryFn: api.tokens });
 

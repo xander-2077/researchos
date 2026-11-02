@@ -76,6 +76,11 @@ export function todayISO(offsetDays = 0): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Local calendar date as YYYY-MM-DD. */
+export function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** Parse a YYYY-MM-DD as a *local* calendar date. */
 export function parseDate(s: string): Date {
   const [y, m, d] = s.slice(0, 10).split("-").map(Number);

@@ -88,6 +88,11 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
       state.tasks.push(t);
       return json(t, 201);
     }
+    if ((m = path.match(/^\/tasks\/(\d+)$/)) && method === "PATCH") {
+      const t = state.tasks.find((x) => x.id === Number(m![1]))!;
+      Object.assign(t, body);
+      return json(t);
+    }
     if (path === "/experiments" && method === "GET") return json(page(state.experiments));
     if (path === "/experiments" && method === "POST") {
       const p = state.projects.find((x) => x.id === body!.project_id)!;

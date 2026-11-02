@@ -47,17 +47,54 @@ curl -s http://127.0.0.1:8000/api/v1/healthz     # {"status":"ok"}
 Keep `RESEARCHOS_BIND=127.0.0.1` and put one of the following in front. **Never publish port
 8000 directly to the internet.**
 
-### Option A — Tailscale (private, simplest)
+### Option A — Tailscale Serve (Docker sidecar)
 
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-sudo tailscale serve --bg 8000          # HTTPS on https://<machine>.<tailnet>.ts.net
-```
+Recommended: private HTTPS access from your own devices only, no open ports, no root on the
+server. The `tailscale` service in `docker-compose.yml` (profile `tailscale`) joins your tailnet
+as its own machine and uses **Tailscale Serve** to proxy `https://<name>.<tailnet>.ts.net` to the
+ResearchOS container. It runs in userspace networking mode (no `/dev/net/tun`, no host changes)
+and keeps its identity in the `researchos-tailscale-state` volume.
 
-Only devices in your tailnet can reach it. Set `RESEARCHOS_COOKIE_SECURE=true` and restart
-(`docker compose up -d`). Agents on other tailnet machines use
-`https://<machine>.<tailnet>.ts.net/mcp`.
+1. In the [Tailscale admin console](https://login.tailscale.com/admin/dns) enable **MagicDNS** and
+   **HTTPS Certificates** (one time per tailnet).
+2. Optionally set the machine name in `.env`: `TS_HOSTNAME=researchos` (default).
+3. Start it:
+
+   ```bash
+   docker compose --profile tailscale up -d
+   docker compose logs tailscale | grep -A1 "To authenticate"   # open this URL and approve (it stays valid; no timeout)
+   ```
+
+   For unattended setups put a pre-auth key in `.env` instead (`TS_AUTHKEY=tskey-auth-…`,
+   create it under *Settings → Keys*) and remove it after the first start.
+4. Check status and the URL:
+
+   ```bash
+   docker compose exec tailscale tailscale status
+   docker compose exec tailscale tailscale serve status
+   ```
+
+5. Open `https://researchos.<your-tailnet>.ts.net` on any device logged into the same tailnet
+   (laptop, phone with the Tailscale app). The first HTTPS request can take a few seconds while the
+   certificate is issued.
+
+Agents on tailnet machines use `https://researchos.<your-tailnet>.ts.net/mcp`.
+
+Notes:
+
+* Serve is tailnet-only. **Funnel (public internet) is explicitly disabled** in
+  `docker/tailscale/serve.json`; keep it that way.
+* Traffic is end-to-end encrypted (WireGuard + HTTPS). You may set `RESEARCHOS_COOKIE_SECURE=true`;
+  if you also use an `ssh -L` tunnel to `http://127.0.0.1`, most browsers still accept Secure
+  cookies on localhost, but Safari may not — leave it `false` in that case.
+* To restrict which tailnet users/devices can reach it, use Tailscale ACLs (tag the machine, e.g.
+  `TS_EXTRA_ARGS=--advertise-tags=tag:researchos` with a pre-auth key that allows the tag).
+* Stop remote access: `docker compose --profile tailscale stop tailscale` (ResearchOS keeps running).
+  Remove the machine from the tailnet: `docker compose --profile tailscale down` + delete the
+  `researchos-tailscale-state` volume + remove it in the admin console.
+
+Alternative without Docker: install Tailscale on the host (`curl -fsSL https://tailscale.com/install.sh | sh`,
+`sudo tailscale up`, `sudo tailscale serve --bg <RESEARCHOS_PORT>`).
 
 ### Option B — Public HTTPS with Caddy
 
@@ -182,4 +219,5 @@ Open http://127.0.0.1:5173 (Vite proxies `/api` and `/mcp` to the backend). Data
 | `RESEARCHOS_LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | Per-IP login attempts |
 | `RESEARCHOS_MAX_BODY_BYTES` | `1000000` | Max request body |
 | `RESEARCHOS_BIND` / `RESEARCHOS_PORT` | `127.0.0.1` / `8000` | Compose port binding |
+| `TS_HOSTNAME` / `TS_AUTHKEY` / `TS_EXTRA_ARGS` | `researchos` / – / – | Tailscale sidecar (profile `tailscale`) |
 | `PIP_INDEX_URL` | `https://pypi.tuna.tsinghua.edu.cn/simple` | PyPI mirror used by `docker compose build` (use `https://pypi.org/simple` outside mainland China) |

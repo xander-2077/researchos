@@ -154,6 +154,68 @@ describe("timeline", () => {
   });
 });
 
+describe("help & docs", () => {
+  it("shows the docs entry, renders a guide and resolves cross-doc links", async () => {
+    state = installFakeApi();
+    renderApp("/help");
+    expect(await screen.findByRole("heading", { level: 1, name: /ResearchOS user guide/ })).toBeInTheDocument();
+    expect(within(screen.getByRole("complementary", { name: "Main navigation" })).getByRole("link", { name: "Help" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Documentation" });
+    for (const name of ["User guide", "MCP integration", "Deployment", "Architecture", "CLAUDE.md template", "AGENTS.md template"]) {
+      expect(within(nav).getByRole("link", { name })).toBeInTheDocument();
+    }
+    // a relative link inside the guide points at the in-app doc, not a file
+    const link = screen.getAllByRole("link", { name: "MCP integration" }).find((a) => a.closest("article"))!;
+    expect(link).toHaveAttribute("href", "/help/mcp-integration");
+    await userEvent.click(link);
+    expect(await screen.findByRole("heading", { level: 1, name: /MCP integration: Claude Code/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /2\. Claude Code/ })).toHaveAttribute("id", "2-claude-code");
+  });
+
+  it("offers templates for copy/download", async () => {
+    state = installFakeApi();
+    renderApp("/help/claude-template");
+    expect(await screen.findByRole("heading", { level: 1, name: /Research tracking with ResearchOS/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "CLAUDE.md" })).toBeInTheDocument();
+  });
+});
+
+describe("timeline calendar", () => {
+  it("shows a month grid with deadlines from an explicit date range", async () => {
+    const p = makeProject({ id: 1, title: "Humanoid WBM" });
+    state = installFakeApi({ projects: [p], tasks: [{ id: 5, project_id: 1, project_slug: p.slug, project_title: "Humanoid WBM", title: "Sim ablation", due_date: todayISO(0), status: "todo", priority: "high", tags: [] }] });
+    renderApp("/timeline");
+    await userEvent.click(await screen.findByRole("radio", { name: /Calendar/ }));
+    expect(await screen.findByRole("grid")).toBeInTheDocument();
+    expect(screen.getAllByRole("gridcell")).toHaveLength(42);
+    await waitFor(() => expect(state.calls.some((c) => c.path === "/dashboard/deadlines" && c.method === "GET")).toBe(true));
+    expect(await screen.findByText("Sim ablation")).toBeInTheDocument();
+  });
+});
+
+describe("kanban drag", () => {
+  it("moves a task to another column via pointer drag (touch handle)", async () => {
+    const p = makeProject({ id: 3, title: "Soccer" });
+    state = installFakeApi({ projects: [p], tasks: [{ id: 9, project_id: 3, project_slug: p.slug, project_title: "Soccer", title: "Run seeds", status: "todo", priority: "high", due_date: null, tags: [] }] });
+    renderApp("/projects/soccer?tab=tasks");
+    const handle = await screen.findByRole("button", { name: "Drag to move" });
+    const target = screen.getByTestId("kanban-blocked");
+    const orig = document.elementFromPoint;
+    document.elementFromPoint = () => target;
+    try {
+      handle.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
+      window.dispatchEvent(new MouseEvent("pointermove", { clientX: 400, clientY: 20 }));
+      window.dispatchEvent(new MouseEvent("pointerup", { clientX: 400, clientY: 20 }));
+    } finally {
+      document.elementFromPoint = orig;
+    }
+    await waitFor(() => {
+      const patch = state.calls.find((c) => c.method === "PATCH" && c.path === "/tasks/9");
+      expect(patch?.body).toEqual({ status: "blocked" });
+    });
+  });
+});
+
 describe("i18n", () => {
   it("switches the UI to Simplified Chinese and remembers it", async () => {
     state = installFakeApi({
