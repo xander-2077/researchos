@@ -94,7 +94,7 @@ export default function TimelinePage() {
   const items = q.data ?? [];
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="ros-toolbar">
         <Segmented ariaLabel={t("View")} value={view} onChange={changeView} options={[
           { value: "gantt", label: <><ChartGantt /> {t("Gantt")}</> }, { value: "list", label: <><CalendarRange /> {t("Timeline")}</> }, { value: "calendar", label: <><CalendarDays /> {t("Calendar")}</> },
         ]} />

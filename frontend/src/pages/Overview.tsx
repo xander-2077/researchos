@@ -23,13 +23,13 @@ function readView(): "grid" | "table" {
 
 function StatCard({ label, value, icon, to, tone, hint }: { label: string; value: number | undefined; icon: ReactNode; to: string; tone?: "danger" | "warning"; hint?: string }) {
   return (
-    <Link to={to} className="group rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-primary/40" data-testid={`stat-${label}`}>
+    <Link to={to} className="group min-w-0 rounded-lg border border-border bg-card px-4 py-3.5 transition-colors hover:border-primary/35 hover:bg-muted/30" data-testid={`stat-${label}`}>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{t(label)}</span>
-        <span className={cn("[&_svg]:size-4", tone === "danger" && value ? "text-danger" : tone === "warning" && value ? "text-warning" : "")}>{icon}</span>
+        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/80 [&_svg]:size-3.5", tone === "danger" && value ? "bg-danger/8 text-danger" : tone === "warning" && value ? "bg-warning/8 text-warning" : "")}>{icon}</span>
       </div>
-      <div className="mt-1.5 flex items-baseline gap-2">
-        {value === undefined ? <Skeleton className="h-7 w-10" /> : <span className={cn("text-2xl font-semibold tabular-nums tracking-tight", tone === "danger" && value > 0 && "text-danger")}>{value}</span>}
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        {value === undefined ? <Skeleton className="h-8 w-10" /> : <span className={cn("text-[28px] font-semibold leading-tight tabular-nums tracking-tight", tone === "danger" && value > 0 && "text-danger")}>{value}</span>}
         {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
       </div>
     </Link>
@@ -55,7 +55,11 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
   const filtered = !!(stage || priority || health);
   return (
     <section aria-label="Projects">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-1 flex items-center gap-2">
+        <h2 className="text-sm font-semibold">{t("Projects")}</h2>
+        {q.data && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">{q.data.total}</span>}
+      </div>
+      <div className="ros-toolbar mb-4">
         <Select aria-label="Filter by stage" className="w-40" value={stage} onChange={(e) => setStage(e.target.value)} options={STAGES} placeholder="All stages" />
         <Select aria-label="Filter by priority" className="w-36" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITIES} placeholder="All priorities" />
         <Select aria-label="Filter by health" className="w-36" value={health} onChange={(e) => setHealth(e.target.value)} options={HEALTHS} placeholder="All health" />
@@ -94,7 +98,7 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
           />
         </Card>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {q.data.items.map((p) => <ProjectCard key={p.id} p={p} />)}
         </div>
       ) : (
@@ -111,7 +115,7 @@ export default function OverviewPage() {
   const review = useNeedsReview();
   const d = s.data;
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <section aria-label="Summary" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Active Projects" value={d?.active_projects} icon={<FolderKanban />} to="/projects" />
         <StatCard label="Open Tasks" value={d?.open_tasks} icon={<ListTodo />} to="/tasks" hint={d?.overdue_tasks ? t("{n} overdue", { n: d.overdue_tasks }) : undefined} />

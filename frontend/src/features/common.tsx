@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   AlertOctagon, ArrowDown, ArrowUp, Bot, CalendarClock, CheckCircle2, ChevronsUpDown, CircleDot, Flag, FlaskConical,
-  GitCommitHorizontal, GripVertical, ListTodo, MoreHorizontal, NotebookPen, Pencil, Terminal, Trash2, User,
+  FolderKanban, GitCommitHorizontal, GripVertical, ListTodo, MoreHorizontal, NotebookPen, Pencil, Terminal, Trash2, User,
 } from "lucide-react";
 import { Badge, ProgressBar } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
@@ -60,15 +60,16 @@ export function ProjectCard({ p }: { p: Project }) {
   return (
     <Link
       to={`/projects/${p.slug}`}
-      className="group flex flex-col gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:shadow-sm focus-visible:ring-2"
+      className="ros-project-card group flex min-w-0 flex-col gap-3.5 rounded-lg border border-border bg-card p-4 transition-[border-color,box-shadow] hover:border-primary/35 focus-visible:ring-2"
       data-testid="project-card"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+      <div className="flex items-start gap-2.5">
+        <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted/70 text-muted-foreground"><FolderKanban className="size-4" strokeWidth={1.6} /></span>
+        <div className="min-w-0 flex-1">
           <h3 className="truncate text-[14px] font-semibold group-hover:text-primary">{p.title}</h3>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{p.target_venue || p.slug}</p>
         </div>
-        <PriorityIcon priority={p.priority} />
+        <span className="pt-1"><PriorityIcon priority={p.priority} /></span>
       </div>
       <div className="flex flex-wrap gap-1.5">
         <Badge value={p.stage} />
@@ -82,7 +83,7 @@ export function ProjectCard({ p }: { p: Project }) {
         </div>
         <ProgressBar value={mp.percent} />
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
         <dt className="text-muted-foreground">{t("Next milestone")}</dt>
         <dd className="truncate text-right">{p.next_milestone ? p.next_milestone.title : <span className="text-muted-foreground">—</span>}</dd>
         <dt className="text-muted-foreground">{t("Next deadline")}</dt>
@@ -105,7 +106,7 @@ export function ProjectCard({ p }: { p: Project }) {
         </div>
       )}
       {p.next_action && !p.blocker_summary && (
-        <p className="line-clamp-2 border-t border-border pt-2 text-xs text-muted-foreground">
+        <p className="mt-auto line-clamp-2 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
           <span className="font-medium text-foreground">{t("Next:")} </span>{p.next_action}
         </p>
       )}
@@ -125,16 +126,16 @@ export function DataTable<T>({ data, columns, empty, onRowClick, rowClassName, i
   });
   if (!data.length && empty) return <>{empty}</>;
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-[inherit]">
       <table className="w-full border-collapse text-[13px]">
-        <thead>
+        <thead className="bg-muted/55">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-border">
               {hg.headers.map((h) => {
                 const sortable = h.column.getCanSort();
                 const dir = h.column.getIsSorted();
                 return (
-                  <th key={h.id} className="h-8 whitespace-nowrap px-3 text-left text-xs font-medium text-muted-foreground" style={{ width: h.getSize() !== 150 ? h.getSize() : undefined }}>
+                  <th key={h.id} className="h-9 whitespace-nowrap px-4 text-left text-[11px] font-medium text-muted-foreground" style={{ width: h.getSize() !== 150 ? h.getSize() : undefined }}>
                     {sortable ? (
                       <button type="button" className="inline-flex cursor-pointer items-center gap-1 hover:text-foreground" onClick={h.column.getToggleSortingHandler()}>
                         {flexRender(h.column.columnDef.header, h.getContext())}
@@ -152,10 +153,10 @@ export function DataTable<T>({ data, columns, empty, onRowClick, rowClassName, i
             <tr
               key={r.id}
               onClick={onRowClick ? () => onRowClick(r.original) : undefined}
-              className={cn("border-b border-border last:border-0 hover:bg-accent/50", onRowClick && "cursor-pointer", rowClassName?.(r.original))}
+              className={cn("border-b border-border/80 transition-colors last:border-0 hover:bg-muted/70", onRowClick && "cursor-pointer", rowClassName?.(r.original))}
             >
               {r.getVisibleCells().map((c) => (
-                <td key={c.id} className="h-10 px-3 align-middle">{flexRender(c.column.columnDef.cell, c.getContext())}</td>
+                <td key={c.id} className="h-11 px-4 py-1.5 align-middle">{flexRender(c.column.columnDef.cell, c.getContext())}</td>
               ))}
             </tr>
           ))}
@@ -394,10 +395,10 @@ export function TaskKanban({ tasks, showProject = true, onAdd }: { tasks: Task[]
             <div
               key={s}
               data-kanban-col={s}
-              className={cn("flex min-h-40 flex-col rounded-lg border border-border bg-muted/40 transition-colors", isOver && "border-primary bg-primary/5")}
+              className={cn("flex min-h-48 min-w-0 flex-col rounded-lg border border-transparent bg-muted/65 transition-colors", isOver && "border-primary bg-primary/5")}
               data-testid={`kanban-${s}`}
             >
-              <div className="flex items-center justify-between px-3 py-2">
+              <div className="flex min-h-12 items-center justify-between px-3 py-2.5">
                 <div className="flex items-center gap-2 text-xs font-medium"><Badge value={s} dot /><span className="tabular-nums text-muted-foreground">{items.length}</span></div>
                 {onAdd && <Button variant="ghost" size="icon-sm" aria-label={`Add ${label(s)} task`} onClick={() => onAdd(s)}>+</Button>}
               </div>
@@ -408,7 +409,7 @@ export function TaskKanban({ tasks, showProject = true, onAdd }: { tasks: Task[]
                     data-kanban-card
                     onPointerDown={(e) => startDrag(e, task, false)}
                     onClick={() => !suppressClick.current && setEditing(task)}
-                    className={cn("cursor-pointer rounded-md border border-border bg-card p-2.5 shadow-xs hover:border-primary/40", drag?.task.id === task.id && "opacity-40")}
+                    className={cn("cursor-pointer rounded-md border border-border bg-card p-3 shadow-xs transition-colors hover:border-primary/35", drag?.task.id === task.id && "opacity-40")}
                   >
                     {cardBody(task, true)}
                     <div className="mt-1.5 md:hidden" onClick={(e) => e.stopPropagation()}><TaskStatusSelect task={task} /></div>
@@ -444,7 +445,7 @@ const EVENT_ICON: Record<string, ReactNode> = {
 export function SourceBadge({ source, actor }: { source: string; actor?: string }) {
   const icon = source === "manual" ? <User className="size-3" /> : source === "rest_api" ? <Terminal className="size-3" /> : <Bot className="size-3" />;
   return (
-    <span title={actor} className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-px text-[11px] text-muted-foreground">
+    <span title={actor} className="inline-flex items-center gap-1 rounded-sm border border-border px-1.5 py-px text-[11px] text-muted-foreground">
       {icon}{label(source)}
     </span>
   );

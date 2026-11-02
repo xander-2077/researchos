@@ -4,7 +4,7 @@ import { cn, label as labelOf } from "@/lib/utils";
 import { t, tn } from "@/i18n";
 
 const fieldBase =
-  "w-full rounded-lg border border-input bg-card px-2.5 text-[13px] text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-60 aria-invalid:border-danger";
+  "w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-[13px] text-foreground placeholder:text-muted-foreground/70 transition-colors hover:border-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/60 disabled:opacity-60 aria-invalid:border-danger";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(({ className, placeholder, ...p }, ref) => (
   <input ref={ref} className={cn(fieldBase, "h-8", className)} placeholder={placeholder && t(placeholder)} {...p} />

@@ -22,6 +22,7 @@ export const zh: Record<string, string> = {
   "Run deleted": "运行已删除",
 
   // ---------------------------------------------------------------- navigation / layout
+  "Personal workspace": "个人科研工作台", Workspace: "工作台",
   Overview: "总览", Projects: "项目", Experiments: "实验", Tasks: "任务", Timeline: "时间线", Activity: "动态", Settings: "设置",
   "Portfolio Overview": "项目组合总览", "Experiment Registry": "实验登记", "Timeline & Deadlines": "时间线与截止日期",
   "Search projects, tasks, experiments…": "搜索项目、任务、实验…", "No results for “{term}”": "未找到“{term}”的结果",

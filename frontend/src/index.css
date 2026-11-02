@@ -2,49 +2,49 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Design tokens — warm paper neutrals with a single clay accent (calm, low-chrome, Claude-like). */
+/* Plane-inspired surfaces: neutral chrome, crisp borders and a restrained blue accent. */
 :root {
-  --background: #faf9f5;
-  --foreground: #1f1e1d;
+  --background: #ffffff;
+  --foreground: #202128;
   --card: #ffffff;
-  --card-foreground: #1f1e1d;
-  --muted: #f3f1ea;
-  --muted-foreground: #6f6d66;
-  --accent: #f0eee6;
-  --accent-foreground: #1f1e1d;
-  --primary: #c15f3c;
+  --card-foreground: #202128;
+  --muted: #f4f5f7;
+  --muted-foreground: #6b6f7b;
+  --accent: #edeff3;
+  --accent-foreground: #202128;
+  --primary: #3e63dd;
   --primary-foreground: #ffffff;
-  --border: #e8e5da;
-  --input: #dcd8cb;
-  --ring: rgb(193 95 60 / 0.4);
-  --destructive: #b53a2d;
-  --sidebar: #f5f3ec;
-  --success: #4d8059;
-  --warning: #b9801f;
-  --danger: #b53a2d;
-  --info: #4b6f9a;
+  --border: #e6e8ed;
+  --input: #dfe1e7;
+  --ring: rgb(62 99 221 / 0.35);
+  --destructive: #d04450;
+  --sidebar: #f7f8fa;
+  --success: #27845d;
+  --warning: #a66b12;
+  --danger: #d04450;
+  --info: #3974b9;
 }
 
 .dark {
-  --background: #262624;
-  --foreground: #f1efe7;
-  --card: #2e2e2b;
-  --card-foreground: #f1efe7;
-  --muted: #33332f;
-  --muted-foreground: #a4a198;
-  --accent: #3a3a36;
-  --accent-foreground: #f1efe7;
-  --primary: #d97757;
-  --primary-foreground: #1c1b19;
-  --border: #3d3c37;
-  --input: #4a4943;
-  --ring: rgb(217 119 87 / 0.45);
-  --destructive: #e0685a;
-  --sidebar: #1f1f1d;
-  --success: #7fb08a;
-  --warning: #d9a441;
-  --danger: #e0685a;
-  --info: #86a8d0;
+  --background: #15171b;
+  --foreground: #eeeef2;
+  --card: #1b1d22;
+  --card-foreground: #eeeef2;
+  --muted: #23262d;
+  --muted-foreground: #a0a4af;
+  --accent: #2b2e36;
+  --accent-foreground: #eeeef2;
+  --primary: #91a7ff;
+  --primary-foreground: #101936;
+  --border: #2c2f37;
+  --input: #383c47;
+  --ring: rgb(145 167 255 / 0.4);
+  --destructive: #ef7a84;
+  --sidebar: #111317;
+  --success: #71c39c;
+  --warning: #e2b366;
+  --danger: #ef7a84;
+  --info: #86b3ed;
 }
 
 @theme inline {
@@ -67,11 +67,11 @@
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-info: var(--info);
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.625rem;
-  --radius-xl: 0.875rem;
-  --radius-2xl: 1.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.75rem;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC", "Noto Serif CJK SC", serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -99,6 +99,40 @@
     outline: 2px solid var(--ring);
     outline-offset: 1px;
   }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 20%, transparent);
+  }
+}
+
+/* Shared visual treatments; page data and controls retain their existing behavior. */
+@layer components {
+  .ros-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ros-toolbar select,
+  .ros-toolbar input {
+    background-color: var(--background);
+  }
+  .ros-project-card {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.025);
+  }
+  .ros-project-card:hover {
+    box-shadow: 0 3px 12px rgb(0 0 0 / 0.045);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Markdown rendering for notes and progress details */
@@ -121,8 +155,8 @@
 .prose-ros th, .prose-ros td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; }
 
 /* Help / documentation pages */
-.prose-help h1 { font-family: var(--font-serif); font-size: 1.75rem; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 1rem; }
-.prose-help h2 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 500; margin: 2rem 0 0.6rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.prose-help h1 { font-size: 1.6rem; font-weight: 600; letter-spacing: -0.025em; margin: 0 0 1rem; }
+.prose-help h2 { font-size: 1.15rem; font-weight: 600; margin: 2rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .prose-help h3 { font-size: 1.02rem; font-weight: 600; margin: 1.4rem 0 0.4rem; }
 .prose-help p, .prose-help li { line-height: 1.7; }
 .prose-help table { font-size: 13px; width: 100%; }

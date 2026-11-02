@@ -90,7 +90,7 @@ export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectI
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="ros-toolbar">
         <div className="relative w-56">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input aria-label="Search experiments" className="pl-8" placeholder="Search experiments…" value={q} onChange={(e) => setQ(e.target.value)} />

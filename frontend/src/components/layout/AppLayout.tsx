@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity, BookOpen, CalendarRange, LifeBuoy, ChevronsLeft, ChevronsRight, FlaskConical, FolderKanban, LayoutDashboard, ListTodo,
-  Languages, LogOut, Menu, Monitor, Moon, NotebookPen, Plus, Search, Settings, Sun, X,
+  Languages, LogOut, Menu, Monitor, Moon, NotebookPen, Plus, Search, Settings, Sun, UserRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form";
@@ -41,19 +41,23 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
       {mobileOpen && <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={onClose} aria-hidden />}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-sidebar transition-[width,transform] md:sticky md:top-0 md:h-screen md:translate-x-0",
-          collapsed ? "md:w-[52px]" : "md:w-56",
+          "fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-border bg-sidebar transition-[width,transform] duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0",
+          collapsed ? "md:w-14" : "md:w-[232px]",
           "w-60",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
         aria-label="Main navigation"
       >
-        <div className={cn("flex h-12 items-center gap-2 px-3", collapsed && "md:justify-center md:px-0")}>
-          <img src="/favicon.svg" alt="" className="size-6" />
-          <span className={cn("font-serif text-[17px] font-medium tracking-tight", collapsed && "md:hidden")}>ResearchOS</span>
+        <div className={cn("flex h-[76px] shrink-0 items-center gap-2.5 px-4", collapsed && "md:justify-center md:px-0")}>
+          <img src="/favicon.svg" alt="" className="size-7 shrink-0" />
+          <div className={cn("min-w-0", collapsed && "md:hidden")}>
+            <div className="text-[14px] font-semibold tracking-tight">ResearchOS</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">{t("Personal workspace")}</div>
+          </div>
           <Button variant="ghost" size="icon-sm" className="ml-auto md:hidden" onClick={onClose} aria-label="Close menu"><X /></Button>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 px-2 py-2">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-3">
+          <div className={cn("px-2.5 pb-2 pt-1 text-[11px] font-medium text-muted-foreground", collapsed && "md:hidden")}>{t("Workspace")}</div>
           {NAV.map(({ to, label: l, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -63,20 +67,22 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
               title={collapsed ? t(l) : undefined}
               className={({ isActive }) =>
                 cn(
-                  "flex h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                  isActive && "bg-accent text-foreground",
+                  "flex h-9 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                  isActive && "bg-primary/9 font-medium text-primary hover:bg-primary/12 hover:text-primary",
+                  to === "/settings" && "mt-auto",
                   collapsed && "md:justify-center md:px-0",
                 )
               }
             >
-              <Icon className="size-4 shrink-0" />
+              <Icon className="size-4 shrink-0" strokeWidth={1.7} />
               <span className={cn(collapsed && "md:hidden")}>{t(l)}</span>
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-border p-2">
-          <div className={cn("flex items-center gap-2 px-1", collapsed && "md:flex-col")}>
-            <span className={cn("flex-1 truncate text-xs text-muted-foreground", collapsed && "md:hidden")}>{me?.username}</span>
+        <div className="shrink-0 border-t border-border p-2.5">
+          <div className={cn("flex items-center gap-2", collapsed && "md:flex-col")}>
+            <span aria-hidden className={cn("flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground", collapsed && "md:hidden")}><UserRound className="size-3.5" /></span>
+            <span className={cn("flex-1 truncate text-xs font-medium", collapsed && "md:hidden")}>{me?.username}</span>
             <Button variant="ghost" size="icon-sm" onClick={() => void logout()} aria-label={t("Log out")} title={t("Log out")}><LogOut /></Button>
             <Button variant="ghost" size="icon-sm" className="hidden md:inline-flex" onClick={toggleSidebar} aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}>
               {collapsed ? <ChevronsRight /> : <ChevronsLeft />}
@@ -125,7 +131,7 @@ function GlobalSearch() {
   const r = results.data;
   const empty = r && !r.projects.length && !r.tasks.length && !r.experiments.length;
   return (
-    <div className="relative w-full max-w-xs">
+    <div className="relative w-full max-w-[280px]">
       <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <input
         ref={ref}
@@ -136,11 +142,11 @@ function GlobalSearch() {
         onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), setOpen(false))}
         placeholder={t("Search projects, tasks, experiments…")}
         aria-label="Global search"
-        className="h-8 w-full rounded-lg border border-input bg-card pl-8 pr-12 text-[13px] placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 w-full min-w-0 rounded-md border border-transparent bg-muted/70 pl-8 pr-10 text-xs transition-colors placeholder:text-muted-foreground focus:border-input focus:bg-card focus:outline-none focus:ring-2 focus:ring-ring"
       />
       <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 sm:block"><Kbd>⌘K</Kbd></span>
       {open && enabled && (
-        <div className="absolute left-0 right-0 top-10 z-50 max-h-96 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgb(0_0_0/0.12)] sm:right-auto sm:w-[26rem]">
+        <div className="fixed left-4 right-4 top-14 z-50 max-h-96 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-[0_8px_24px_rgb(0_0_0/0.12)] sm:absolute sm:left-auto sm:right-0 sm:top-10 sm:w-[26rem]">
           {results.isLoading && <div className="flex justify-center p-4"><Spinner /></div>}
           {empty && <p className="p-3 text-center text-xs text-muted-foreground">{t("No results for “{term}”", { term })}</p>}
           {r?.projects.length ? <SearchGroup title={t("Projects")}>{r.projects.map((p) => <SearchItem key={p.id} onSelect={() => go(`/projects/${p.slug}`)} title={p.title} meta={label(p.stage)} />)}</SearchGroup> : null}
@@ -241,6 +247,7 @@ export function AppLayout() {
   const loc = useLocation();
   const section = loc.pathname.split("/")[1] ?? "";
   const title = TITLES[section] ? t(TITLES[section]) : "ResearchOS";
+  const SectionIcon = NAV.find((item) => item.to === `/${section}`)?.icon ?? LayoutDashboard;
   useEffect(() => {
     document.title = `${title} · ResearchOS`;
   }, [title]);
@@ -249,19 +256,20 @@ export function AppLayout() {
     <div className="flex min-h-screen">
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur md:px-5">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-1.5 border-b border-border bg-background/95 px-3 backdrop-blur-sm md:gap-2 md:px-6">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu /></Button>
-          <h1 className="hidden truncate font-serif text-[17px] font-medium sm:block sm:min-w-32">
+          <SectionIcon aria-hidden className="hidden size-4 shrink-0 text-muted-foreground sm:block" strokeWidth={1.7} />
+          <h1 className="hidden truncate text-[13px] font-medium sm:block sm:min-w-24">
             <Link to={loc.pathname}>{title}</Link>
           </h1>
-          <div className="flex flex-1 justify-center px-2"><GlobalSearch /></div>
+          <div className="flex min-w-0 flex-1 justify-end px-1 md:pr-3"><GlobalSearch /></div>
           {showProjectFilter && <ProjectFilter />}
           <NewMenu />
           <Button variant="ghost" size="icon" aria-label={t("Help")} title={t("Help")} onClick={() => navigate("/help")} className="hidden sm:inline-flex"><LifeBuoy /></Button>
           <LanguageToggle />
           <ThemeToggle />
         </header>
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-3 py-5 md:px-6">
+        <main className="mx-auto w-full max-w-[1600px] min-w-0 flex-1 px-4 py-6 md:px-7 lg:py-7">
           <Suspense fallback={<div className="flex justify-center py-16"><Spinner /></div>}>
             <Outlet />
           </Suspense>

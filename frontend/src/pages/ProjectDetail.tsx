@@ -31,7 +31,7 @@ function InlineSelect({ project, field, options, ariaLabel }: { project: Project
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[130px_1fr] gap-3 py-2 text-[13px]">
+    <div className="grid grid-cols-1 gap-1.5 py-3 text-[13px] sm:grid-cols-[130px_minmax(0,1fr)] sm:gap-3 sm:py-2">
       <dt className="text-muted-foreground">{t(k)}</dt>
       <dd className="min-w-0 whitespace-pre-wrap break-words">{children || <span className="text-muted-foreground">—</span>}</dd>
     </div>
@@ -50,7 +50,7 @@ function OverviewTab({ p }: { p: Project }) {
           <Row k="Description">{p.description}</Row>
           <Row k="Target venue">{p.target_venue}</Row>
           <Row k="Submission">{p.submission_deadline ? <DueDate date={p.submission_deadline} /> : null}</Row>
-          <Row k="Repository">{p.repository_url ? <a href={p.repository_url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-primary hover:underline"><GitBranch className="size-3.5" />{p.repository_url.replace(/^https?:\/\//, "")}</a> : null}</Row>
+          <Row k="Repository">{p.repository_url ? <a href={p.repository_url} target="_blank" rel="noreferrer noopener" className="inline-flex max-w-full items-start gap-1 text-primary hover:underline"><GitBranch className="mt-0.5 size-3.5 shrink-0" /><span className="min-w-0 break-all">{p.repository_url.replace(/^https?:\/\//, "")}</span></a> : null}</Row>
           <Row k="Last updated">{formatDateTime(p.updated_at)}</Row>
         </dl>
       </Card>
@@ -216,7 +216,7 @@ function NotesTab({ p }: { p: Project }) {
             </>
           ) : p.links.length ? (
             <ul className="space-y-1.5">{p.links.map((l, i) => (
-              <li key={i}><a href={l.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 text-[13px] text-primary hover:underline"><ExternalLink className="size-3.5" />{l.label || l.url}</a></li>
+              <li key={i}><a href={l.url} target="_blank" rel="noreferrer noopener" className="inline-flex max-w-full items-start gap-1.5 text-[13px] text-primary hover:underline"><ExternalLink className="mt-0.5 size-3.5 shrink-0" /><span className="min-w-0 break-words [overflow-wrap:anywhere]">{l.label || l.url}</span></a></li>
             ))}</ul>
           ) : <p className="text-xs text-muted-foreground">{t("No links. Click Edit to add paper drafts, slides or docs.")}</p>}
         </div>
@@ -245,12 +245,12 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="pb-1">
         <Link to="/projects" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> {t("Projects")}</Link>
-        <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-xl font-semibold tracking-tight">{p.title}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <h2 className="text-[22px] font-semibold tracking-tight">{p.title}</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span className="font-mono">{p.slug}</span>
               {p.target_venue && <span>{p.target_venue}</span>}
               {p.submission_deadline && <span className="inline-flex items-center gap-1"><CalendarClock className="size-3.5" /><DueDate date={p.submission_deadline} /></span>}

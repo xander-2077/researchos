@@ -6,15 +6,15 @@ import { ApiError } from "@/services/api";
 import { t, tn } from "@/i18n";
 
 export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-xl border border-border bg-card text-card-foreground", className)} {...p} />;
+  return <div className={cn("rounded-lg border border-border bg-card text-card-foreground", className)} {...p} />;
 }
 
 export function CardHeader({ title, action, className, sub }: { title: ReactNode; action?: ReactNode; className?: string; sub?: ReactNode }) {
   return (
-    <div className={cn("flex items-center justify-between gap-2 border-b border-border px-4 py-2.5", className)}>
+    <div className={cn("flex min-h-12 items-center justify-between gap-3 border-b border-border px-4 py-3", className)}>
       <div className="min-w-0">
-        <h3 className="truncate text-[13px] font-semibold">{tn(title)}</h3>
-        {sub && <p className="text-xs text-muted-foreground">{tn(sub)}</p>}
+        <h3 className="truncate text-[13px] font-medium">{tn(title)}</h3>
+        {sub && <p className="mt-0.5 text-xs text-muted-foreground">{tn(sub)}</p>}
       </div>
       {action}
     </div>
@@ -24,7 +24,7 @@ export function CardHeader({ title, action, className, sub }: { title: ReactNode
 export function Badge({ value, text, className, dot }: { value?: string | null; text?: ReactNode; className?: string; dot?: boolean }) {
   const t = tone(value);
   return (
-    <span className={cn("inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-full border px-2 text-[11px] font-medium", TONE_CLASSES[t], className)}>
+    <span className={cn("inline-flex h-5 items-center gap-1.5 whitespace-nowrap rounded-sm border px-1.5 text-[11px] font-medium", TONE_CLASSES[t], className)}>
       {dot && <span className="size-1.5 rounded-full bg-current" />}
       {text !== undefined ? tn(text) : label(value)}
     </span>
@@ -44,7 +44,7 @@ export function EmptyState({ title, description, action, icon, className }: {
 }) {
   return (
     <div className={cn("flex flex-col items-center justify-center gap-2 px-6 py-10 text-center", className)}>
-      <div className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <div className="mb-1 flex size-10 items-center justify-center rounded-lg border border-border bg-muted/60 text-muted-foreground">
         {icon ?? <Inbox className="size-4" />}
       </div>
       <p className="text-sm font-medium">{t(title)}</p>
@@ -74,7 +74,7 @@ export function ErrorState({ error, onRetry, className }: { error: unknown; onRe
 
 export function ProgressBar({ value, className }: { value: number | null; className?: string }) {
   return (
-    <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-muted", className)}>
+    <div className={cn("h-1 w-full overflow-hidden rounded-full bg-muted", className)}>
       {value !== null && (
         <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       )}
@@ -83,14 +83,14 @@ export function ProgressBar({ value, className }: { value: number | null; classN
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="rounded border border-border bg-muted px-1 font-mono text-[10px] text-muted-foreground">{children}</kbd>;
+  return <kbd className="rounded-sm border border-border bg-card px-1 py-px font-mono text-[10px] text-muted-foreground">{children}</kbd>;
 }
 
 export function Segmented<T extends string>({ value, onChange, options, ariaLabel }: {
   value: T; onChange: (v: T) => void; options: { value: T; label: ReactNode; title?: string }[]; ariaLabel: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex h-8 items-center rounded-lg border border-border bg-muted p-0.5">
+    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex h-8 shrink-0 items-center rounded-md bg-muted p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -100,8 +100,8 @@ export function Segmented<T extends string>({ value, onChange, options, ariaLabe
           title={o.title}
           onClick={() => onChange(o.value)}
           className={cn(
-            "inline-flex h-full items-center gap-1 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors cursor-pointer [&_svg]:size-3.5",
-            value === o.value && "bg-card text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.08)]",
+            "inline-flex h-full items-center gap-1.5 rounded-sm px-2.5 text-xs font-medium text-muted-foreground transition-colors cursor-pointer [&_svg]:size-3.5",
+            value === o.value && "bg-card text-foreground shadow-[0_1px_3px_rgb(0_0_0/0.1)]",
           )}
         >
           {o.label}

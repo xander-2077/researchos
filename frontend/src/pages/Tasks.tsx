@@ -55,16 +55,16 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Task presets">
+      <div className="flex items-center gap-5 overflow-x-auto border-b border-border" role="tablist" aria-label="Task presets">
         {PRESETS.map((p) => (
           <button key={p.id} role="tab" aria-selected={preset === p.id} type="button" onClick={() => setPreset(p.id)}
-            className={cn("h-7 cursor-pointer rounded-full border px-3 text-xs font-medium transition-colors",
-              preset === p.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}>
+            className={cn("h-10 shrink-0 cursor-pointer whitespace-nowrap border-b-2 px-0.5 text-[13px] font-medium transition-colors",
+              preset === p.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
             {t(p.label)}
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="ros-toolbar">
         <div className="relative w-56">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input aria-label="Search tasks" className="pl-8" placeholder="Search tasks…" value={q} onChange={(e) => setQ(e.target.value)} />

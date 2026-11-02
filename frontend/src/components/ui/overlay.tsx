@@ -15,17 +15,17 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 data-[state=open]:animate-in" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 backdrop-blur-[2px] data-[state=open]:animate-in" />
         <DialogPrimitive.Content
           className={cn(
-            "fixed left-1/2 top-[8vh] z-50 flex max-h-[84vh] w-[calc(100vw-2rem)] -translate-x-1/2 flex-col rounded-2xl border border-border bg-card shadow-[0_12px_40px_rgb(0_0_0/0.16)] focus:outline-none",
+            "fixed left-1/2 top-[8vh] z-50 flex max-h-[84vh] w-[calc(100vw-2rem)] -translate-x-1/2 flex-col rounded-xl border border-border bg-card shadow-[0_16px_64px_rgb(0_0_0/0.18)] focus:outline-none",
             wide ? "max-w-3xl" : "max-w-lg",
             className,
           )}
         >
           <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-3.5">
             <div>
-              <DialogPrimitive.Title className="font-serif text-[17px] font-medium">{tn(title)}</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="text-base font-semibold tracking-tight">{tn(title)}</DialogPrimitive.Title>
               {description ? (
                 <DialogPrimitive.Description className="mt-0.5 text-xs text-muted-foreground">{tn(description)}</DialogPrimitive.Description>
               ) : (
@@ -39,7 +39,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
             </DialogPrimitive.Close>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {footer && <div className="flex justify-end gap-2 border-t border-border px-5 py-3">{footer}</div>}
+          {footer && <div className="flex justify-end gap-2 rounded-b-xl border-t border-border bg-muted/40 px-5 py-3">{footer}</div>}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
@@ -79,7 +79,7 @@ export function DropdownContent({ className, align = "end", ...p }: ComponentPro
       <DM.Content
         align={align}
         sideOffset={4}
-        className={cn("z-50 min-w-44 rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgb(0_0_0/0.12)]", className)}
+        className={cn("z-50 min-w-44 rounded-lg border border-border bg-card p-1 shadow-[0_4px_20px_rgb(0_0_0/0.1)]", className)}
         {...p}
       />
     </DM.Portal>
@@ -90,7 +90,7 @@ export function DropdownItem({ className, ...p }: ComponentProps<typeof DM.Item>
   return (
     <DM.Item
       className={cn(
-        "flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] outline-none data-[highlighted]:bg-accent [&_svg]:size-4 [&_svg]:text-muted-foreground",
+        "flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none data-[highlighted]:bg-accent [&_svg]:size-4 [&_svg]:text-muted-foreground",
         className,
       )}
       {...p}
@@ -106,13 +106,13 @@ export const DropdownLabel = ({ children }: { children: ReactNode }) => (
 // ------------------------------------------------------------------ Tabs
 export const Tabs = TabsPrimitive.Root;
 export function TabsList({ className, ...p }: ComponentProps<typeof TabsPrimitive.List>) {
-  return <TabsPrimitive.List className={cn("flex gap-1 overflow-x-auto border-b border-border", className)} {...p} />;
+  return <TabsPrimitive.List className={cn("flex gap-4 overflow-x-auto border-b border-border", className)} {...p} />;
 }
 export function TabsTrigger({ className, ...p }: ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "-mb-px inline-flex h-9 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground [&_svg]:size-3.5",
+        "-mb-px inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 border-transparent px-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary [&_svg]:size-3.5",
         className,
       )}
       {...p}
