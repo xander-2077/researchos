@@ -1,0 +1,19 @@
+[Unit]
+Description=ResearchOS reverse SSH tunnel to Aliyun
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=<LOCAL_USER>
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o IdentityAgent=none -o ExitOnForwardFailure=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R 127.0.0.1:10001:127.0.0.1:8000 <SSH_HOST>
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
