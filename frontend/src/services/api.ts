@@ -68,6 +68,27 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   return data as T;
 }
 
+export interface UploadedImage { url: string; name: string; size: number; content_type: string }
+
+/** Upload an image (raw body) for use in Markdown fields. */
+async function uploadImage(file: Blob): Promise<UploadedImage> {
+  const headers: Record<string, string> = { Accept: "application/json", "Content-Type": file.type || "application/octet-stream" };
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+  let res: Response;
+  try {
+    res = await fetch("/api/v1/uploads", { method: "POST", headers, credentials: "same-origin", body: file });
+  } catch {
+    throw new ApiError(0, "network_error", "Cannot reach the ResearchOS server");
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401) onUnauthorized?.();
+    const err = data?.error ?? {};
+    throw new ApiError(res.status, err.code ?? "error", err.message ?? `Request failed (${res.status})`, err.details);
+  }
+  return data as UploadedImage;
+}
+
 const get = <T>(p: string, q?: Query) => request<T>("GET", p, undefined, q);
 const post = <T>(p: string, b?: unknown) => request<T>("POST", p, b ?? {});
 const patch = <T>(p: string, b: unknown) => request<T>("PATCH", p, b);
@@ -105,6 +126,7 @@ export interface RunInput {
 }
 
 export const api = {
+  uploadImage,
   me: () => get<Me>("/auth/me"),
   login: (username: string, password: string) => post<{ username: string; csrf_token: string }>("/auth/login", { username, password }),
   logout: () => post<{ ok: boolean }>("/auth/logout"),

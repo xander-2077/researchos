@@ -52,7 +52,10 @@ experiments in the browser, and let Claude Code or Codex read and update them ov
 3. Lists and detail pages show **mean ± std** per metric across runs.
 4. After checking the evidence, click **Mark verified**. Agents can only record results as *Needs Review*
    and cannot change verified results without explicit confirmation.
-5. Don't upload checkpoints, videos or raw logs — store paths/URLs.
+5. **Description**, **Conclusion** and project **Notes** are Markdown and take images (plots, screenshots):
+   click **Insert image**, paste, or drop a PNG/JPEG/GIF/WebP (≤ 10 MB). Images are stored in the data
+   volume under `uploads/`; `scripts/backup.sh` mirrors them to `backups/uploads/`.
+6. Don't upload checkpoints, videos or raw logs — store paths/URLs.
 
 ## 4. Connect Claude Code / Codex
 

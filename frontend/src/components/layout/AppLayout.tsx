@@ -2,7 +2,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, BookOpen, CalendarRange, LifeBuoy, ChevronsLeft, ChevronsRight, FlaskConical, FolderKanban, LayoutDashboard, ListTodo,
+  Activity, BookOpen, CalendarRange, ChevronsLeft, ChevronsRight, FlaskConical, FolderKanban, LayoutDashboard, ListTodo,
   Languages, LogOut, Menu, Monitor, Moon, NotebookPen, Plus, Search, Settings, Sun, UserRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -97,14 +97,10 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
       >
         <div className={cn("flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4", collapsed && "md:justify-center md:px-0")}>
           <img src="/favicon.svg" alt="" className="size-7 shrink-0" />
-          <div className={cn("min-w-0", collapsed && "md:hidden")}>
-            <div className="text-[14px] font-semibold tracking-tight">ResearchOS</div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground">{t("Personal workspace")}</div>
-          </div>
+          <div className={cn("min-w-0 text-[14px] font-semibold tracking-tight", collapsed && "md:hidden")}>ResearchOS</div>
           <Button variant="ghost" size="icon-sm" className="ml-auto md:hidden" onClick={onClose} aria-label="Close menu"><X /></Button>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-3 pt-3">
-          <div className={cn("px-2.5 pb-1 text-[11px] font-medium text-muted-foreground", collapsed && "md:hidden")}>{t("Workspace")}</div>
           {NAV.filter((n) => !BOTTOM.has(n.to)).map((n) => <NavItem key={n.to} {...n} collapsed={collapsed} onClose={onClose} />)}
           <SidebarProjects collapsed={collapsed} onClose={onClose} />
           <div className="mt-auto flex flex-col gap-1 pt-2">
@@ -275,7 +271,6 @@ function NewMenu() {
 
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const navigate = useNavigate();
   const loc = useLocation();
   const section = loc.pathname.split("/")[1] ?? "";
   const title = TITLES[section] ? t(TITLES[section]) : "ResearchOS";
@@ -297,7 +292,6 @@ export function AppLayout() {
           <div className="flex min-w-0 flex-1 justify-end px-1 md:pr-3"><GlobalSearch /></div>
           {showProjectFilter && <ProjectFilter />}
           <NewMenu />
-          <Button variant="ghost" size="icon" aria-label={t("Help")} title={t("Help")} onClick={() => navigate("/help")} className="hidden sm:inline-flex"><LifeBuoy /></Button>
           <LanguageToggle />
           <ThemeToggle />
         </header>

@@ -21,11 +21,23 @@ import { TaskFormDialog } from "./forms";
 import { t } from "@/i18n";
 import { localizeSummary } from "@/i18n/activity";
 
-export function Markdown({ children, className }: { children: string; className?: string }) {
+/** Keep single line breaks of plain-text notes (outside fenced code). */
+function softBreaks(md: string) {
+  return md.split(/(```[\s\S]*?```)/g).map((part, i) => (i % 2 ? part : part.replace(/([^\n])\n(?=[^\n])/g, "$1  \n"))).join("");
+}
+
+export function Markdown({ children, className, breaks }: { children: string; className?: string; breaks?: boolean }) {
   return (
     <div className={cn("prose-ros text-[13px]", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: (p) => <a {...p} target="_blank" rel="noreferrer noopener" /> }}>
-        {children}
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+        a: (p) => <a {...p} target="_blank" rel="noreferrer noopener" />,
+        img: ({ src, alt }) => (
+          <a href={typeof src === "string" ? src : undefined} target="_blank" rel="noreferrer noopener" className="ros-md-img">
+            <img src={typeof src === "string" ? src : undefined} alt={alt ?? ""} loading="lazy" />
+          </a>
+        ),
+      }}>
+        {breaks ? softBreaks(children) : children}
       </ReactMarkdown>
     </div>
   );
@@ -65,13 +77,12 @@ export function ProjectCard({ p, handle, className }: { p: Project; handle?: Rea
       className={cn("ros-project-card group flex h-full min-w-0 flex-col gap-3.5 rounded-lg border border-border bg-card p-4 transition-[border-color,box-shadow] hover:border-primary/35 focus-visible:ring-2", className)}
       data-testid="project-card"
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-center gap-2.5">
         <ProjectIcon icon={p.icon} color={p.color} />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-[14px] font-semibold group-hover:text-primary">{p.title}</h3>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{p.target_venue || p.slug}</p>
+          <h3 className="truncate text-[18px] font-semibold leading-tight group-hover:text-primary">{p.title}</h3>
         </div>
-        <span className="pt-1"><PriorityIcon priority={p.priority} /></span>
+        <span className="inline-flex items-center"><PriorityIcon priority={p.priority} /></span>
         {handle}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -99,8 +110,6 @@ export function ProjectCard({ p, handle, className }: { p: Project; handle?: Rea
         </dd>
         <dt className="text-muted-foreground">{t("Open tasks")}</dt>
         <dd className="text-right tabular-nums">{p.open_task_count}</dd>
-        <dt className="text-muted-foreground">{t("Last activity")}</dt>
-        <dd className="text-right">{relativeTime(p.last_activity_at)}</dd>
       </dl>
       {(p.blocker_summary || p.blocked_task_count > 0) && (
         <div className="flex items-start gap-1.5 rounded-md bg-danger/8 px-2 py-1.5 text-xs text-danger">

@@ -20,6 +20,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api import projects as projects_api
 from app.api import system as system_api
+from app.api import uploads as uploads_api
 from app.api import work as work_api
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
@@ -149,7 +150,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         log.exception("Unhandled error")
         return JSONResponse({"error": {"code": "internal_error", "message": "Internal server error"}}, status_code=500)
 
-    for r in (system_api.router, projects_api.router, work_api.router):
+    app.state.settings = settings
+    for r in (system_api.router, projects_api.router, work_api.router, uploads_api.router):
         app.include_router(r, prefix="/api/v1")
 
     # MCP Streamable HTTP endpoint (shares process, DB and services).
@@ -171,7 +173,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     app.add_middleware(RateLimitMiddleware, per_minute=settings.rate_limit_per_minute,
                        login_per_minute=settings.login_rate_limit_per_minute)
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes,
+                       overrides={"/api/v1/uploads": settings.upload_max_bytes})
     app.add_middleware(SecurityHeadersMiddleware)
 
     _mount_frontend(app, settings.frontend_dist)

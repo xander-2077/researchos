@@ -21,16 +21,20 @@ async def _send_json(send: Send, status: int, code: str, message: str, headers: 
 
 
 class BodySizeLimitMiddleware:
-    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+    """Rejects bodies above ``max_bytes``; ``overrides`` maps exact paths to a larger limit."""
+
+    def __init__(self, app: ASGIApp, max_bytes: int, overrides: dict[str, int] | None = None) -> None:
         self.app = app
         self.max_bytes = max_bytes
+        self.overrides = overrides or {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
+        limit = self.overrides.get(scope.get("path", ""), self.max_bytes)
         for k, v in scope.get("headers", []):
-            if k == b"content-length" and v.isdigit() and int(v) > self.max_bytes:
-                return await _send_json(send, 413, "payload_too_large", f"Request body exceeds {self.max_bytes} bytes")
+            if k == b"content-length" and v.isdigit() and int(v) > limit:
+                return await _send_json(send, 413, "payload_too_large", f"Request body exceeds {limit} bytes")
         received = 0
 
         async def limited_receive() -> Message:
@@ -38,14 +42,14 @@ class BodySizeLimitMiddleware:
             msg = await receive()
             if msg["type"] == "http.request":
                 received += len(msg.get("body", b""))
-                if received > self.max_bytes:
+                if received > limit:
                     raise _TooLarge()
             return msg
 
         try:
             await self.app(scope, limited_receive, send)
         except _TooLarge:
-            await _send_json(send, 413, "payload_too_large", f"Request body exceeds {self.max_bytes} bytes")
+            await _send_json(send, 413, "payload_too_large", f"Request body exceeds {limit} bytes")
 
 
 class _TooLarge(Exception):

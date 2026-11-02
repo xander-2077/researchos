@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertOctagon, CalendarClock, FlaskConical, FolderKanban, LayoutGrid, ListTodo, Plus, Rows3,
+  AlertOctagon, CalendarClock, ChevronDown, FlaskConical, FolderKanban, LayoutGrid, ListTodo, Plus, Rows3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form";
@@ -36,10 +36,12 @@ function StatCard({ label, value, icon, to, tone, hint }: { label: string; value
   );
 }
 
-export function Portfolio({ defaultArchived = "active", showArchiveFilter = false, action }: {
-  defaultArchived?: "active" | "archived" | "all"; showArchiveFilter?: boolean; action?: ReactNode;
+export function Portfolio({ defaultArchived = "active", showArchiveFilter = false, action, collapsible = false }: {
+  defaultArchived?: "active" | "archived" | "all"; showArchiveFilter?: boolean; action?: ReactNode; collapsible?: boolean;
 }) {
   const { openCreate } = useAppState();
+  const [expanded, setExpanded] = useState(true);
+  const contentId = useId();
   const [view, setViewState] = useState<"grid" | "table">(readView);
   const [archived, setArchived] = useState(defaultArchived);
   const setView = (v: "grid" | "table") => {
@@ -54,9 +56,17 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
   return (
     <section aria-label="Projects">
       <div className="ros-toolbar mb-4">
-        <h2 className="text-sm font-semibold">{t("Projects")}</h2>
-        {q.data && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">{q.data.total}</span>}
-        {view === "grid" && (q.data?.items.length ?? 0) > 1 && <span className="hidden text-xs text-muted-foreground sm:inline">{t("Drag cards to reorder")}</span>}
+        <h2 className="text-sm font-semibold">
+          {collapsible ? (
+            <button type="button" aria-expanded={expanded} aria-controls={contentId}
+              aria-label={t(expanded ? "Collapse projects" : "Expand projects")}
+              onClick={() => setExpanded((value) => !value)}
+              className="inline-flex items-center gap-1.5 rounded-sm py-1 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <ChevronDown aria-hidden="true" className={cn("size-4 transition-transform", !expanded && "-rotate-90")} />
+              {t("Projects")}
+            </button>
+          ) : t("Projects")}
+        </h2>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {showArchiveFilter && (
             <Select aria-label="Archived filter" className="w-32" value={archived} onChange={(e) => setArchived(e.target.value as typeof archived)}>
@@ -70,6 +80,7 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
           {action}
         </div>
       </div>
+      <div id={contentId} hidden={collapsible && !expanded}>
       {q.isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-64" />)}</div>
       ) : q.isError ? (
@@ -88,6 +99,7 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
       ) : (
         <Card><ProjectTable projects={q.data.items} /></Card>
       )}
+      </div>
     </section>
   );
 }
@@ -104,16 +116,16 @@ export default function OverviewPage() {
         <StatCard label="Active Projects" value={d?.active_projects} icon={<FolderKanban />} to="/projects" />
         <StatCard label="Open Tasks" value={d?.open_tasks} icon={<ListTodo />} to="/tasks" hint={d?.overdue_tasks ? t("{n} overdue", { n: d.overdue_tasks }) : undefined} />
         <StatCard label="Running Experiments" value={d?.running_experiments} icon={<FlaskConical />} to="/experiments?status=running" hint={d?.experiments_needing_review ? t("{n} to review", { n: d.experiments_needing_review }) : undefined} />
-        <StatCard label="Upcoming Deadlines" value={d?.upcoming_deadlines} icon={<CalendarClock />} to="/timeline" tone="warning" hint={t("next 14 days")} />
+        <StatCard label="Upcoming Deadlines" value={d?.upcoming_deadlines} icon={<CalendarClock />} to="/timeline" tone="warning" />
         <StatCard label="Blocked Projects" value={d?.blocked_projects} icon={<AlertOctagon />} to="/projects" tone="danger" />
       </section>
       {s.isError && <Card><ErrorState error={s.error} onRetry={() => s.refetch()} /></Card>}
 
-      <Portfolio />
+      <Portfolio collapsible />
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader title="Upcoming Deadlines" sub="Next 30 days, incl. overdue" action={<Link to="/timeline" className="text-xs text-primary hover:underline">{t("All")}</Link>} />
+          <CardHeader title="Upcoming Deadlines" action={<Link to="/timeline" className="text-xs text-primary hover:underline">{t("All")}</Link>} />
           <div className="px-4 py-1">
             {deadlines.isLoading ? <div className="space-y-2 py-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-9" />)}</div>
               : deadlines.isError ? <ErrorState error={deadlines.error} onRetry={() => deadlines.refetch()} />

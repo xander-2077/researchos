@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 600
     login_rate_limit_per_minute: int = 10
     max_body_bytes: int = 1_000_000
+    upload_max_bytes: int = 10_000_000  # images for Markdown fields
 
     # MCP: Host header allow-list for DNS-rebinding protection. Empty = disabled
     # (Bearer tokens are always required regardless).

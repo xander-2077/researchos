@@ -115,13 +115,13 @@ export default function TimelinePage() {
       ) : (
         <>
           <Card>
-            <CardHeader title="Near-term timeline" sub={t("Next {n} days by project", { n: days })} />
+            <CardHeader title="Near-term timeline" />
             <Lanes items={items} days={days} />
           </Card>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {groupByWhen(items).map(([title, list]) => (
               <Card key={title}>
-                <CardHeader title={title} sub={t("{n} item(s)", { n: list.length })} className={title === "Overdue" ? "text-danger" : ""} />
+                <CardHeader title={title} className={title === "Overdue" ? "text-danger" : ""} />
                 <div className="px-4 py-1"><DeadlineList items={list} /></div>
               </Card>
             ))}

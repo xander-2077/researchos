@@ -153,6 +153,10 @@
 .prose-ros blockquote { border-left: 3px solid var(--border); padding-left: 0.75rem; color: var(--muted-foreground); }
 .prose-ros table { border-collapse: collapse; margin: 0.5rem 0; }
 .prose-ros th, .prose-ros td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; }
+.prose-ros .ros-md-img { display: block; width: fit-content; max-width: 100%; margin: 0.5rem 0; text-decoration: none; }
+.prose-ros img { display: block; max-width: 100%; max-height: 480px; height: auto; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--muted); }
+.prose-ros > :first-child { margin-top: 0; }
+.prose-ros > :last-child { margin-bottom: 0; }
 
 /* Help / documentation pages */
 .prose-help h1 { font-size: 1.6rem; font-weight: 600; letter-spacing: -0.025em; margin: 0 0 1rem; }

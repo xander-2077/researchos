@@ -6,6 +6,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Dialog } from "@/components/ui/overlay";
 import { useMilestones, useProjects, useTasks, useWrite } from "@/hooks/queries";
 import { IconPicker } from "@/components/icons/project-icons";
+import { MarkdownInput } from "./markdown-input";
 import { api, type RunInput } from "@/services/api";
 import { t } from "@/i18n";
 import {
@@ -309,18 +310,18 @@ export function ExperimentFormDialog({ open, onOpenChange, experiment, projectId
   };
   const { values: v, errors: e, set } = f;
   return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title={experiment ? "Edit experiment" : "New experiment"} description="An experiment is one condition (e.g. an ablation variant). Add runs/seeds to it afterwards." onSubmit={submit} busy={m.isPending} submitLabel={experiment ? "Save" : "Create experiment"} wide>
+    <FormDialog open={open} onOpenChange={onOpenChange} title={experiment ? "Edit experiment" : "New experiment"} onSubmit={submit} busy={m.isPending} submitLabel={experiment ? "Save" : "Create experiment"} wide>
       <ProjectSelect value={v.project_id} onChange={(x) => f.setValues((s) => ({ ...s, project_id: x }))} error={e.project_id} disabled={!!experiment} />
       <Field label="Name" required error={e.name} className="sm:col-span-2">{(id) => <Input id={id} value={v.name} onChange={set("name")} autoFocus aria-invalid={!!e.name} placeholder="Ablation: no world model" />}</Field>
       {!experiment && <Field label="Key" error={e.experiment_key} hint="Stable id for agents; derived from name if empty">{(id) => <Input id={id} value={v.experiment_key} onChange={set("experiment_key")} placeholder="ablation-no-world-model" />}</Field>}
       <Field label="Group" hint="e.g. an ablation study">{(id) => <Input id={id} value={v.group_name} onChange={set("group_name")} placeholder="World-model ablations" />}</Field>
       <Field label="Type">{(id) => <Select id={id} value={v.type} onChange={set("type")} options={EXPERIMENT_TYPES} />}</Field>
-      <Field label="Status" hint={v.status === "verified" ? "Verified = you have checked the evidence." : undefined}>{(id) => <Select id={id} value={v.status} onChange={set("status")} options={EXPERIMENT_STATUSES} />}</Field>
+      <Field label="Status">{(id) => <Select id={id} value={v.status} onChange={set("status")} options={EXPERIMENT_STATUSES} />}</Field>
       <Field label="Baseline">{(id) => <Input id={id} value={v.baseline} onChange={set("baseline")} />}</Field>
       <Field label="Variant">{(id) => <Input id={id} value={v.variant} onChange={set("variant")} />}</Field>
       <Field label="Hypothesis" className="sm:col-span-2">{(id) => <Textarea id={id} value={v.hypothesis} onChange={set("hypothesis")} rows={2} />}</Field>
-      <Field label="Description" className="sm:col-span-2">{(id) => <Textarea id={id} value={v.description} onChange={set("description")} rows={2} />}</Field>
-      <Field label="Conclusion" className="sm:col-span-2">{(id) => <Textarea id={id} value={v.conclusion} onChange={set("conclusion")} rows={2} />}</Field>
+      <Field label="Description" className="sm:col-span-2">{(id) => <MarkdownInput id={id} value={v.description} onChange={(x) => f.setValues((s) => ({ ...s, description: x }))} rows={4} />}</Field>
+      <Field label="Conclusion" className="sm:col-span-2">{(id) => <MarkdownInput id={id} value={v.conclusion} onChange={(x) => f.setValues((s) => ({ ...s, conclusion: x }))} rows={3} />}</Field>
     </FormDialog>
   );
 }

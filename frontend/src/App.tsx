@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 import type { ReactNode } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -66,6 +66,7 @@ function Gate() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpPage />} />
             <Route path="help/:doc" element={<HelpPage />} />
+            <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

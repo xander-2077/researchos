@@ -5,13 +5,13 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardHeader, EmptyState, ErrorState, Skeleton } from "@/components/ui/misc";
 import { ConfirmDialog, DropdownContent, DropdownItem, DropdownMenu, DropdownSeparator, DropdownTrigger } from "@/components/ui/overlay";
-import { DataTable } from "@/features/common";
+import { DataTable, Markdown } from "@/features/common";
 import { ExperimentRegistry, MetricStat } from "@/features/experiments";
 import { ExperimentFormDialog, RunFormDialog } from "@/features/forms";
 import { useAppState } from "@/hooks/app-state";
 import { useExperiment, useWrite } from "@/hooks/queries";
 import { api } from "@/services/api";
-import { formatDateTime, formatNumber, label, relativeTime, shortSha } from "@/lib/utils";
+import { formatNumber, label, relativeTime, shortSha } from "@/lib/utils";
 import type { Run } from "@/types/api";
 import { t } from "@/i18n";
 
@@ -107,16 +107,20 @@ export function ExperimentDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader title="Design" />
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 p-4 text-[13px] sm:grid-cols-2">
-            {[["Hypothesis", e.hypothesis], ["Baseline", e.baseline], ["Variant", e.variant], ["Description", e.description]].map(([k, v]) => (
-              <div key={k}><dt className="text-xs text-muted-foreground">{t(k)}</dt><dd className="mt-0.5 whitespace-pre-wrap">{v || <span className="text-muted-foreground">—</span>}</dd></div>
-            ))}
-            <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">{t("Conclusion")}</dt><dd className="mt-0.5 whitespace-pre-wrap">{e.conclusion || <span className="text-muted-foreground">{t("No conclusion recorded yet.")}</span>}</dd></div>
-            <div className="text-xs text-muted-foreground sm:col-span-2">{t("Created {a} · Updated {b}", { a: formatDateTime(e.created_at), b: formatDateTime(e.updated_at) })}</div>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 p-4 text-[13px] sm:grid-cols-2">
+            {([["Hypothesis", e.hypothesis, true], ["Baseline", e.baseline, false], ["Variant", e.variant, false], ["Description", e.description, true], ["Conclusion", e.conclusion, true]] as const)
+              .filter(([, v]) => v)
+              .map(([k, v, wide]) => (
+                <div key={k} className={wide ? "sm:col-span-2" : ""}>
+                  <dt className="text-xs text-muted-foreground">{t(k)}</dt>
+                  <dd className="mt-1"><Markdown breaks>{v}</Markdown></dd>
+                </div>
+              ))}
+            {!e.conclusion && <div className="text-muted-foreground sm:col-span-2">{t("No conclusion recorded yet.")}</div>}
           </dl>
         </Card>
         <Card>
-          <CardHeader title="Metrics across runs" sub="mean ± std (sample)" />
+          <CardHeader title="Metrics across runs" />
           {metricNames.length ? (
             <table className="w-full text-[13px]">
               <tbody>

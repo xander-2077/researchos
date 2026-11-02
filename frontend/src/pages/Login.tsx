@@ -57,7 +57,6 @@ docker compose exec researchos python -m app.cli set-password
             </form>
           )}
         </div>
-        <p className="mt-4 text-center text-xs text-muted-foreground">{t("Self-hosted research portfolio · REST · MCP")}</p>
         <div className="mt-3 flex justify-center gap-3 text-xs">
           {LANGS.map((l) => (
             <button key={l.value} type="button" onClick={() => setLang(l.value)} className={lang === l.value ? "font-semibold text-foreground" : "cursor-pointer text-muted-foreground hover:text-foreground"}>{l.label}</button>

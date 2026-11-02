@@ -18,6 +18,27 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+describe("overview projects", () => {
+  it("collapses and restores projects with the keyboard without changing data", async () => {
+    state = installFakeApi({ projects: [makeProject({ id: 1, title: "Soccer" })] });
+    renderApp();
+    const user = userEvent.setup();
+    const card = await screen.findByTestId("project-card");
+    const toggle = screen.getByRole("button", { name: "Collapse projects" });
+    expect(card).toBeVisible();
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(card).not.toBeVisible();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Upcoming Deadlines", { selector: "h3" })).toBeVisible();
+    await user.keyboard(" ");
+    expect(card).toBeVisible();
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(state.calls.filter((c) => c.method !== "GET")).toHaveLength(0);
+  });
+});
+
 
 describe("kanban ordering", () => {
   it("reorders cards inside a column from the keyboard and saves a fractional position", async () => {

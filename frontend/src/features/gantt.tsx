@@ -347,7 +347,7 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
           </div>
         </div>
       </Card>
-      <p className="text-xs text-muted-foreground">{t("Drag a bar to reschedule, drag its edges to resize. Keyboard: ←/→ move, Shift+←/→ change the end date, Enter edit.")}</p>
+      <p className="sr-only">{t("Drag a bar to reschedule, drag its edges to resize. Keyboard: ←/→ move, Shift+←/→ change the end date, Enter edit.")}</p>
       <TaskFormDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)} task={editing ?? undefined} />
     </div>
   );

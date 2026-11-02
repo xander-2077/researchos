@@ -5,12 +5,13 @@ import {
   FlaskConical, GitBranch, LayoutList, ListTodo, MoreHorizontal, NotebookPen, Pencil, Plus, StickyNote, Target, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input, Select, Textarea } from "@/components/ui/form";
+import { Input, Select } from "@/components/ui/form";
 import { Badge, Card, CardHeader, EmptyState, ErrorState, ProgressBar, Segmented, Skeleton } from "@/components/ui/misc";
 import {
   ConfirmDialog, DropdownContent, DropdownItem, DropdownMenu, DropdownSeparator, DropdownTrigger, Tabs, TabsContent, TabsList, TabsTrigger,
 } from "@/components/ui/overlay";
 import { ActivityList, DueDate, Markdown, TaskTable } from "@/features/common";
+import { MarkdownInput } from "@/features/markdown-input";
 import { TaskKanban } from "@/features/kanban";
 import { GanttChart } from "@/features/gantt";
 import { IconPicker } from "@/components/icons/project-icons";
@@ -132,8 +133,7 @@ function MilestonesTab({ p }: { p: Project }) {
   const [add, setAdd] = useState(false);
   return (
     <div className="max-w-3xl space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{t("Progress = completed / non-cancelled milestones. Ordered by due date.")}</p>
+      <div className="flex items-center justify-end">
         <Button size="sm" onClick={() => setAdd(true)}><Plus /> {t("Milestone")}</Button>
       </div>
       {q.isLoading ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data?.length ? (
@@ -200,11 +200,11 @@ function NotesTab({ p }: { p: Project }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
-        <CardHeader title="Notes" sub="Markdown" action={editing ? (
+        <CardHeader title="Notes" action={editing ? (
           <div className="flex gap-2"><Button size="sm" variant="secondary" onClick={() => setEditing(false)}>{t("Cancel")}</Button><Button size="sm" onClick={() => save.mutate(undefined)} disabled={save.isPending}>{t("Save")}</Button></div>
         ) : <Button size="sm" variant="secondary" onClick={() => setEditing(true)}><Pencil /> {t("Edit")}</Button>} />
         <div className="p-4">
-          {editing ? <Textarea aria-label="Project notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={18} className="font-mono text-xs" placeholder="# Ideas, decisions, reading notes…" />
+          {editing ? <MarkdownInput aria-label="Project notes" value={notes} onChange={setNotes} rows={18} className="font-mono text-xs" placeholder="# Ideas, decisions, reading notes…" />
             : p.notes ? <Markdown>{p.notes}</Markdown> : <EmptyState icon={<StickyNote className="size-4" />} title="No notes yet" description="Keep lightweight Markdown notes; link out to Overleaf, Notion or Google Docs for long documents." />}
         </div>
       </Card>

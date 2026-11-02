@@ -29,6 +29,9 @@ export const zh: Record<string, string> = {
   "All projects": "全部项目", New: "新建", Create: "创建", Project: "项目", Experiment: "实验",
   Light: "浅色", Dark: "深色", Theme: "主题", Language: "语言", "Log out": "退出登录",
   "Expand sidebar": "展开侧边栏", "Collapse sidebar": "收起侧边栏", "Page not found": "页面不存在", "Go to overview": "返回总览",
+  "Expand projects": "展开项目", "Collapse projects": "收起项目",
+  "Insert image": "插入图片", "Uploading…": "上传中…", "Upload failed": "上传失败",
+  "{name} is larger than 10 MB": "{name} 超过 10 MB", "Only PNG, JPEG, GIF and WebP images are accepted": "仅支持 PNG、JPEG、GIF 和 WebP 图片",
 
   // ---------------------------------------------------------------- common UI
   Cancel: "取消", Confirm: "确认", Save: "保存", "Saving…": "保存中…", Edit: "编辑", Delete: "删除", Retry: "重试",

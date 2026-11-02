@@ -40,7 +40,7 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     const url = new URL(input, "http://localhost");
     const path = url.pathname.replace(/^\/api\/v1/, "");
     const method = (opts.method ?? "GET").toUpperCase();
-    const body = opts.body ? (JSON.parse(String(opts.body)) as Json) : undefined;
+    const body = typeof opts.body === "string" ? (JSON.parse(opts.body) as Json) : undefined;
     state.calls.push({ method, path, body, headers: (opts.headers ?? {}) as Record<string, string> });
     const q = url.searchParams;
     let m: RegExpMatchArray | null;
@@ -56,6 +56,12 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
       return json({ username: "admin", csrf_token: "csrf-2" });
     }
     if (!state.authenticated) return json({ error: { code: "unauthorized", message: "Not authenticated" } }, 401);
+
+    if (path === "/uploads" && method === "POST") {
+      const blob = opts.body as Blob;
+      const ext = blob.type === "image/jpeg" ? "jpg" : "png";
+      return json({ url: `/api/v1/uploads/${"a".repeat(32)}.${ext}`, name: `${"a".repeat(32)}.${ext}`, size: blob.size, content_type: blob.type }, 201);
+    }
 
     if (path === "/projects" && method === "GET") {
       let items = state.projects.filter((p) => q.get("include_all") === "true" || String(p.archived) === (q.get("archived") ?? "false"));
