@@ -22,7 +22,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 def test_migration_creates_schema_matching_models(tmp_path: Path):
     url = f"sqlite:///{tmp_path / 'm.db'}"
     upgrade_to_head(url)
-    assert current_revision(url) == "0002"
+    assert current_revision(url) == "0003"
     eng = create_engine(url)
     with eng.connect() as conn:
         tables = set(inspect(conn).get_table_names())

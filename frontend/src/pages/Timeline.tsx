@@ -10,6 +10,7 @@ import { cn, formatDate, parseDate, todayISO } from "@/lib/utils";
 import type { DeadlineItem } from "@/types/api";
 import { t } from "@/i18n";
 import { MonthCalendar } from "@/features/calendar";
+import { GanttChart } from "@/features/gantt";
 import { CalendarDays, ChartGantt } from "lucide-react";
 
 const KIND_COLOR: Record<string, string> = {
@@ -78,10 +79,14 @@ export default function TimelinePage() {
   const [days, setDays] = useState(60);
   const [kinds, setKinds] = useState("submission,milestone,task");
   const [overdue, setOverdue] = useState<"yes" | "no">("yes");
-  const [view, setView] = useState<"list" | "calendar">(() => {
-    try { return localStorage.getItem("researchos-timeline-view") === "calendar" ? "calendar" : "list"; } catch { return "list"; }
+  type View = "gantt" | "list" | "calendar";
+  const [view, setView] = useState<View>(() => {
+    try {
+      const v = localStorage.getItem("researchos-timeline-view");
+      return v === "calendar" || v === "list" ? v : "gantt";
+    } catch { return "gantt"; }
   });
-  const changeView = (v: "list" | "calendar") => {
+  const changeView = (v: View) => {
     setView(v);
     try { localStorage.setItem("researchos-timeline-view", v); } catch { /* ignore */ }
   };
@@ -91,21 +96,21 @@ export default function TimelinePage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Segmented ariaLabel={t("View")} value={view} onChange={changeView} options={[
-          { value: "list", label: <><ChartGantt /> {t("Timeline")}</> }, { value: "calendar", label: <><CalendarDays /> {t("Calendar")}</> },
+          { value: "gantt", label: <><ChartGantt /> {t("Gantt")}</> }, { value: "list", label: <><CalendarRange /> {t("Timeline")}</> }, { value: "calendar", label: <><CalendarDays /> {t("Calendar")}</> },
         ]} />
         {view === "list" && <Select aria-label="Window" className="w-36" value={String(days)} onChange={(e) => setDays(Number(e.target.value))}>
           {[["7", "Next 7 days"], ["14", "Next 14 days"], ["30", "Next 30 days"], ["60", "Next 60 days"], ["120", "Next 120 days"], ["365", "Next year"]].map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
         </Select>}
-        <Select aria-label="Kinds" className="w-48" value={kinds} onChange={(e) => setKinds(e.target.value)}>
+        {view !== "gantt" && <Select aria-label="Kinds" className="w-48" value={kinds} onChange={(e) => setKinds(e.target.value)}>
           <option value="submission,milestone,task">{t("All deadline types")}</option>
           <option value="submission">{t("Paper submissions")}</option>
           <option value="milestone">{t("Milestones")}</option>
           <option value="task">{t("Task due dates")}</option>
           <option value="submission,milestone">{t("Submissions + milestones")}</option>
-        </Select>
+        </Select>}
         {view === "list" && <Segmented ariaLabel="Overdue" value={overdue} onChange={setOverdue} options={[{ value: "yes", label: t("Include overdue") }, { value: "no", label: t("Upcoming only") }]} />}
       </div>
-      {view === "calendar" ? <MonthCalendar kinds={kinds} projectId={projectFilter} /> : q.isLoading ? <Skeleton className="h-64" /> : q.isError ? <Card><ErrorState error={q.error} onRetry={() => q.refetch()} /></Card> : !items.length ? (
+      {view === "gantt" ? <GanttChart projectId={projectFilter} /> : view === "calendar" ? <MonthCalendar kinds={kinds} projectId={projectFilter} /> : q.isLoading ? <Skeleton className="h-64" /> : q.isError ? <Card><ErrorState error={q.error} onRetry={() => q.refetch()} /></Card> : !items.length ? (
         <Card><EmptyState icon={<CalendarRange className="size-4" />} title="No deadlines in this window" description="Set submission deadlines on projects, due dates on milestones and tasks." /></Card>
       ) : (
         <>

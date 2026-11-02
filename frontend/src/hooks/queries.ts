@@ -12,8 +12,8 @@ export const useProject = (ref: string | number | undefined) =>
   useQuery({ queryKey: ["project", String(ref)], queryFn: () => api.project(ref!), enabled: ref !== undefined && ref !== "" });
 export const useMilestones = (projectId: number | undefined) =>
   useQuery({ queryKey: ["milestones", projectId], queryFn: () => api.milestones(projectId!), enabled: !!projectId });
-export const useTasks = (q: Q = {}) =>
-  useQuery({ queryKey: ["tasks", q], queryFn: () => api.tasks(q), placeholderData: keepPreviousData });
+export const useTasks = (q: Q = {}, opts: { enabled?: boolean } = {}) =>
+  useQuery({ queryKey: ["tasks", q], queryFn: () => api.tasks(q), placeholderData: keepPreviousData, enabled: opts.enabled ?? true });
 export const useExperiments = (q: Q = {}) =>
   useQuery({ queryKey: ["experiments", q], queryFn: () => api.experiments(q), placeholderData: keepPreviousData });
 export const useExperiment = (id: number | undefined) =>

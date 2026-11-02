@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Experiment, ExperimentRun, Milestone, ProgressEvent, Project, Task
+from app.models import Experiment, ExperimentRun, Milestone, ProgressEvent, Project, Task, TaskDependency
 
 EXPORT_VERSION = 1
 
@@ -37,4 +37,7 @@ def export_all(db: Session) -> dict[str, Any]:
         "version": EXPORT_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         **{name: [_row(o) for o in db.scalars(select(model).order_by(model.id))] for name, model in tables.items()},
+        "task_dependencies": [
+            _row(o) for o in db.scalars(select(TaskDependency).order_by(TaskDependency.task_id, TaskDependency.depends_on_id))
+        ],
     }

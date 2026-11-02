@@ -80,8 +80,8 @@ export type ProjectInput = Partial<
 > & { version?: number };
 
 export type TaskInput = Partial<
-  Pick<Task, "project_id" | "milestone_id" | "title" | "description" | "status" | "priority" | "due_date"
-    | "tags" | "git_reference" | "notes">
+  Pick<Task, "project_id" | "milestone_id" | "title" | "description" | "status" | "priority" | "start_date" | "due_date"
+    | "depends_on" | "tags" | "git_reference" | "notes">
 >;
 export type MilestoneInput = Partial<Pick<Milestone, "title" | "description" | "status" | "due_date">>;
 export type ExperimentInput = Partial<

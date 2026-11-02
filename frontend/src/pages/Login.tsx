@@ -37,10 +37,10 @@ export default function LoginPage({ setupRequired }: { setupRequired?: boolean }
           <img src="/favicon.svg" alt="" className="size-8" />
           <span className="text-lg font-semibold tracking-tight">ResearchOS</span>
         </div>
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-7">
           {setupRequired ? (
             <div className="space-y-3 text-[13px]">
-              <h1 className="text-base font-semibold">{t("Create the admin account")}</h1>
+              <h1 className="font-serif text-xl font-medium">{t("Create the admin account")}</h1>
               <p className="text-muted-foreground">{t("No admin user exists yet. For security this is done on the server, not in the browser:")}</p>
               <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{`# Docker
 docker compose exec researchos python -m app.cli set-password
@@ -50,7 +50,7 @@ docker compose exec researchos python -m app.cli set-password
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4" noValidate>
-              <h1 className="text-base font-semibold">{t("Sign in")}</h1>
+              <h1 className="font-serif text-xl font-medium">{t("Sign in")}</h1>
               <Field label="Username">{(id) => <Input id={id} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />}</Field>
               <Field label="Password" error={error}>{(id) => <Input id={id} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />}</Field>
               <Button type="submit" className="w-full" disabled={busy}>{busy ? t("Signing in…") : t("Sign in")}</Button>

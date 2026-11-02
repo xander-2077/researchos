@@ -37,6 +37,7 @@ experiments in the browser, and let Claude Code or Codex read and update them ov
 ### Cross-project views
 
 - **Tasks**: presets (Open, Top priority, Due in 7 days, Overdue, Blocked, All) plus status/priority/date/keyword filters; overdue rows are highlighted.
+- **Gantt** (Timeline page, default): tasks as bars grouped by project, with milestones, submission deadlines, a today line and finish-to-start dependency arrows (red = a task starts before its prerequisite finishes). Drag a bar to reschedule it, drag its edges to resize, or use the keyboard (←/→ move, Shift+←/→ change the end date, Enter edit). Set a task's **Start date** and **Depends on** in the task form. Zoom: day / week / month.
 - **Timeline**: per-project near-term timeline, or switch to **Calendar** for a month view of submissions, milestones and task due dates.
 - **Activity**: filter by project, source, event type and time.
 - **Global search** (⌘K / Ctrl+K) across projects, tasks and experiments.
@@ -75,7 +76,7 @@ docker compose logs tailscale        # first start: open the login URL printed h
 ```
 
 Then open `https://researchos.<your-tailnet>.ts.net` from any device in your tailnet. Enable **MagicDNS**
-and **HTTPS Certificates** in the Tailscale admin console once. See [deployment](deployment.md#option-a--tailscale-serve-docker-sidecar).
+and **HTTPS Certificates** in the Tailscale admin console once. See [deployment](deployment.md#方案-atailscale-内网-https).
 
 ## 6. Backup & upgrade
 

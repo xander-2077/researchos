@@ -127,6 +127,7 @@ class Task(TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(16), default="todo", index=True)
     priority: Mapped[str] = mapped_column(String(16), default="medium")
+    start_date: Mapped[date | None] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date, index=True)
     tags: Mapped[list[Any]] = mapped_column(JSON, default=list)
     git_reference: Mapped[str] = mapped_column(String(300), default="")
@@ -135,6 +136,24 @@ class Task(TimestampMixin, Base):
 
     project: Mapped[Project] = relationship(back_populates="tasks")
     milestone: Mapped[Milestone | None] = relationship()
+    dep_links: Mapped[list["TaskDependency"]] = relationship(
+        foreign_keys="TaskDependency.task_id", cascade="all, delete-orphan", passive_deletes=True,
+        lazy="selectin", order_by="TaskDependency.depends_on_id",
+    )
+
+    @property
+    def depends_on(self) -> list[int]:
+        """Ids of tasks that must finish before this one starts (finish-to-start)."""
+        return [d.depends_on_id for d in self.dep_links]
+
+
+class TaskDependency(Base):
+    __tablename__ = "task_dependencies"
+
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
+    depends_on_id: Mapped[int] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
 
 
 class Experiment(TimestampMixin, Base):

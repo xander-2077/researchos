@@ -104,7 +104,9 @@ export interface Task {
   description: string;
   status: TaskStatus;
   priority: Priority;
+  start_date: string | null;
   due_date: string | null;
+  depends_on: number[];
   tags: string[];
   git_reference: string;
   notes: string;

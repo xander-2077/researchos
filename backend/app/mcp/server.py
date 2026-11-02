@@ -197,7 +197,8 @@ async def get_project(
             rows, total, *_ = task_svc.list_tasks(db, actor, project_id=p.id, open_only=True, limit=limit)
             out["open_tasks_list"] = [
                 {"task_id": t.id, "title": t.title, "status": t.status, "priority": t.priority,
-                 "due_date": _iso(t.due_date), "milestone_id": t.milestone_id} for t in rows]
+                 "start_date": _iso(t.start_date), "due_date": _iso(t.due_date), "depends_on": t.depends_on,
+                 "milestone_id": t.milestone_id} for t in rows]
         if "experiments" in include:
             rows, *_ = exp_svc.list_experiments(db, actor, project_id=p.id, sort="-updated_at", limit=limit)
             out["recent_experiments"] = [
@@ -271,6 +272,11 @@ async def upsert_task(
     status: TaskStatus | None = None,
     priority: Priority | None = None,
     due_date: Annotated[date | None, Field(description="YYYY-MM-DD")] = None,
+    start_date: Annotated[date | None, Field(description="YYYY-MM-DD; must not be after due_date. Drives the Gantt bar")] = None,
+    depends_on: Annotated[
+        list[int] | None,
+        Field(description="Task ids in the same project that must finish first (replaces the whole list; [] clears)"),
+    ] = None,
     milestone_id: int | None = None,
     tags: list[str] | None = None,
     git_reference: Annotated[str | None, Field(description="Commit SHA, branch or PR URL")] = None,
@@ -280,7 +286,8 @@ async def upsert_task(
 
     fields = {k: v for k, v in {
         "title": title, "description": description, "status": status, "priority": priority,
-        "due_date": due_date, "milestone_id": milestone_id, "tags": tags, "git_reference": git_reference,
+        "due_date": due_date, "start_date": start_date, "depends_on": depends_on,
+        "milestone_id": milestone_id, "tags": tags, "git_reference": git_reference,
     }.items() if v is not None}
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
@@ -288,7 +295,8 @@ async def upsert_task(
         t, created = task_svc.upsert_task(db, actor, p.id, task_id, client_key, fields)
         return {
             "task_id": t.id, "project": p.slug, "created": created, "title": t.title, "status": t.status,
-            "priority": t.priority, "due_date": _iso(t.due_date), "milestone_id": t.milestone_id,
+            "priority": t.priority, "start_date": _iso(t.start_date), "due_date": _iso(t.due_date),
+            "depends_on": t.depends_on, "milestone_id": t.milestone_id,
             "summary": f"{'Created' if created else 'Updated'} task #{t.id} '{t.title}' ({t.status})"
             + ("" if created else f"; fields: {', '.join(sorted(fields)) or 'none'}"),
         }

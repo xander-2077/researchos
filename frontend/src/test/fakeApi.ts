@@ -87,7 +87,7 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     }
     if (path === "/tasks" && method === "POST") {
       const p = state.projects.find((x) => x.id === body!.project_id)!;
-      const t = { id: nextId++, client_key: null, description: "", tags: [], git_reference: "", notes: "", milestone_id: null, due_date: null,
+      const t = { id: nextId++, client_key: null, description: "", tags: [], git_reference: "", notes: "", milestone_id: null, start_date: null, due_date: null, depends_on: [],
         created_at: "", updated_at: "", completed_at: null, project_slug: p.slug, project_title: p.title, milestone_title: null, ...body };
       state.tasks.push(t);
       return json(t, 201);
@@ -109,6 +109,7 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     if (path === "/dashboard/summary") return json({ active_projects: state.projects.length, open_tasks: state.tasks.length, running_experiments: 0,
       upcoming_deadlines: 0, blocked_projects: 0, overdue_tasks: 0, experiments_needing_review: 0, milestones_completed_last_7d: 0 });
     if (path === "/dashboard/deadlines") {
+      if (!(q.get("kinds") ?? "task").split(",").includes("task")) return json([]);
       const items = state.tasks.filter((t) => t.due_date).map((t) => ({
         kind: "task", id: t.id, title: t.title, due_date: t.due_date, status: t.status ?? "todo", priority: t.priority ?? "medium",
         project_id: t.project_id, project_slug: t.project_slug, project_title: t.project_title,

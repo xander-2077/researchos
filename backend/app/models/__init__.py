@@ -7,6 +7,7 @@ from app.models.entities import (  # noqa: F401
     ProgressEvent,
     Project,
     Task,
+    TaskDependency,
     User,
     utcnow,
 )

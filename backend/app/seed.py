@@ -16,6 +16,7 @@ from app.schemas.entities import (
     ProjectCreate,
     RunCreate,
     TaskCreate,
+    TaskUpdate,
 )
 from app.services import activity, experiments, milestones, projects, tasks
 
@@ -57,9 +58,17 @@ def seed_demo(db: Session) -> str:
             ),
             milestones=[("Simulation environment", "completed", d(-30)), ("World-model ablation", "in_progress", d(5)),
                         ("Paper submission", "planned", d(20))],
+            deps={"Make goal-rate plot": ["Re-run seeds 3-5 for no-world-model ablation"],
+                  "Analyse ablation results": ["Re-run seeds 3-5 for no-world-model ablation", "Run full-model baseline, 5 seeds"],
+                  "Write related work": ["Write method section"],
+                  "Proofread and submit": ["Analyse ablation results", "Write related work"]},
             tasks=[("Re-run seeds 3-5 for no-world-model ablation", "blocked", "critical", d(2), ["experiment"]),
                    ("Write method section", "in_progress", "high", d(6), ["writing"]),
-                   ("Make goal-rate plot", "todo", "medium", d(-1), ["figure"])],
+                   ("Make goal-rate plot", "todo", "medium", d(-1), ["figure"]),
+                   ("Run full-model baseline, 5 seeds", "done", "high", d(-8), ["experiment"]),
+                   ("Analyse ablation results", "todo", "high", d(11), ["analysis"]),
+                   ("Write related work", "todo", "medium", d(15), ["writing"]),
+                   ("Proofread and submit", "todo", "critical", d(20), ["writing"])],
         ),
         dict(
             project=ProjectCreate(
@@ -78,9 +87,14 @@ def seed_demo(db: Session) -> str:
         created.append(p)
         for title, status, due in s["milestones"]:
             milestones.create_milestone(db, DEMO, p.id, MilestoneCreate(title=title, status=status, due_date=due))
+        by_title = {}
         for title, status, prio, due, tags in s["tasks"]:
-            tasks.create_task(db, DEMO, TaskCreate(project_id=p.id, title=title, status=status, priority=prio,
-                                                   due_date=due, tags=tags))
+            span = 3 if prio in ("low", "medium") else 5
+            by_title[title] = tasks.create_task(db, DEMO, TaskCreate(
+                project_id=p.id, title=title, status=status, priority=prio, due_date=due, tags=tags,
+                start_date=due - timedelta(days=span)))
+        for title, deps in s.get("deps", {}).items():
+            tasks.update_task(db, DEMO, by_title[title].id, TaskUpdate(depends_on=[by_title[x].id for x in deps]))
 
     soccer = created[1]
     for key, name, variant, status, sr in [

@@ -50,7 +50,7 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
       >
         <div className={cn("flex h-12 items-center gap-2 px-3", collapsed && "md:justify-center md:px-0")}>
           <img src="/favicon.svg" alt="" className="size-6" />
-          <span className={cn("text-[14px] font-semibold tracking-tight", collapsed && "md:hidden")}>ResearchOS</span>
+          <span className={cn("font-serif text-[17px] font-medium tracking-tight", collapsed && "md:hidden")}>ResearchOS</span>
           <Button variant="ghost" size="icon-sm" className="ml-auto md:hidden" onClick={onClose} aria-label="Close menu"><X /></Button>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 px-2 py-2">
@@ -63,7 +63,7 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
               title={collapsed ? t(l) : undefined}
               className={({ isActive }) =>
                 cn(
-                  "flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                  "flex h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
                   isActive && "bg-accent text-foreground",
                   collapsed && "md:justify-center md:px-0",
                 )
@@ -136,11 +136,11 @@ function GlobalSearch() {
         onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), setOpen(false))}
         placeholder={t("Search projects, tasks, experiments…")}
         aria-label="Global search"
-        className="h-8 w-full rounded-md border border-input bg-card pl-8 pr-12 text-[13px] placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 w-full rounded-lg border border-input bg-card pl-8 pr-12 text-[13px] placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
       />
       <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 sm:block"><Kbd>⌘K</Kbd></span>
       {open && enabled && (
-        <div className="absolute left-0 right-0 top-10 z-50 max-h-96 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg sm:right-auto sm:w-[26rem]">
+        <div className="absolute left-0 right-0 top-10 z-50 max-h-96 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgb(0_0_0/0.12)] sm:right-auto sm:w-[26rem]">
           {results.isLoading && <div className="flex justify-center p-4"><Spinner /></div>}
           {empty && <p className="p-3 text-center text-xs text-muted-foreground">{t("No results for “{term}”", { term })}</p>}
           {r?.projects.length ? <SearchGroup title={t("Projects")}>{r.projects.map((p) => <SearchItem key={p.id} onSelect={() => go(`/projects/${p.slug}`)} title={p.title} meta={label(p.stage)} />)}</SearchGroup> : null}
@@ -251,7 +251,7 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur md:px-5">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu /></Button>
-          <h1 className="hidden truncate text-[14px] font-semibold sm:block sm:min-w-32">
+          <h1 className="hidden truncate font-serif text-[17px] font-medium sm:block sm:min-w-32">
             <Link to={loc.pathname}>{title}</Link>
           </h1>
           <div className="flex flex-1 justify-center px-2"><GlobalSearch /></div>

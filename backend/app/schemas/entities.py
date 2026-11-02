@@ -7,7 +7,7 @@ import re
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.enums import (
     ExperimentStatus,
@@ -173,7 +173,9 @@ class TaskCreate(Strict):
     description: str = Field(default="", max_length=20_000)
     status: TaskStatus = "todo"
     priority: Priority = "medium"
+    start_date: date | None = None
     due_date: date | None = None
+    depends_on: list[int] = Field(default_factory=list, description="Task ids (same project) that must finish first")
     tags: list[str] = Field(default_factory=list)
     git_reference: str = Field(default="", max_length=300)
     notes: str = Field(default="", max_length=50_000)
@@ -183,6 +185,12 @@ class TaskCreate(Strict):
     def _tags(cls, v: list[str] | None) -> list[str] | None:
         return clean_tags(v)
 
+    @model_validator(mode="after")
+    def _dates(self):
+        if self.start_date and self.due_date and self.start_date > self.due_date:
+            raise ValueError("start_date must not be after due_date")
+        return self
+
 
 class TaskUpdate(Strict):
     project_id: int | None = None
@@ -191,7 +199,9 @@ class TaskUpdate(Strict):
     description: str | None = Field(default=None, max_length=20_000)
     status: TaskStatus | None = None
     priority: Priority | None = None
+    start_date: date | None = None
     due_date: date | None = None
+    depends_on: list[int] | None = None
     tags: list[str] | None = None
     git_reference: str | None = Field(default=None, max_length=300)
     notes: str | None = Field(default=None, max_length=50_000)
@@ -211,7 +221,9 @@ class TaskOut(ORMModel):
     description: str
     status: str
     priority: str
+    start_date: date | None
     due_date: date | None
+    depends_on: list[int]
     tags: list[str]
     git_reference: str
     notes: str

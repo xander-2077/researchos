@@ -6,7 +6,7 @@ import { ApiError } from "@/services/api";
 import { t, tn } from "@/i18n";
 
 export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-border bg-card text-card-foreground", className)} {...p} />;
+  return <div className={cn("rounded-xl border border-border bg-card text-card-foreground", className)} {...p} />;
 }
 
 export function CardHeader({ title, action, className, sub }: { title: ReactNode; action?: ReactNode; className?: string; sub?: ReactNode }) {
@@ -90,7 +90,7 @@ export function Segmented<T extends string>({ value, onChange, options, ariaLabe
   value: T; onChange: (v: T) => void; options: { value: T; label: ReactNode; title?: string }[]; ariaLabel: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex h-8 items-center rounded-md border border-border bg-muted p-0.5">
+    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex h-8 items-center rounded-lg border border-border bg-muted p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -100,8 +100,8 @@ export function Segmented<T extends string>({ value, onChange, options, ariaLabe
           title={o.title}
           onClick={() => onChange(o.value)}
           className={cn(
-            "inline-flex h-full items-center gap-1 rounded-[5px] px-2 text-xs font-medium text-muted-foreground transition-colors cursor-pointer [&_svg]:size-3.5",
-            value === o.value && "bg-card text-foreground shadow-xs",
+            "inline-flex h-full items-center gap-1 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors cursor-pointer [&_svg]:size-3.5",
+            value === o.value && "bg-card text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.08)]",
           )}
         >
           {o.label}

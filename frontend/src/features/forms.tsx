@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Dialog } from "@/components/ui/overlay";
-import { useMilestones, useProjects, useWrite } from "@/hooks/queries";
+import { useMilestones, useProjects, useTasks, useWrite } from "@/hooks/queries";
 import { api, type RunInput } from "@/services/api";
 import { t } from "@/i18n";
 import {
@@ -188,11 +188,13 @@ const taskSchema = z.object({
   description: z.string().max(20000),
   status: z.enum(TASK_STATUSES),
   priority: z.enum(PRIORITIES),
+  start_date: optDate,
   due_date: optDate,
+  depends_on: z.array(z.number()),
   tags: z.string().transform((s) => s.split(",").map((t) => t.trim()).filter(Boolean)),
   git_reference: z.string().max(300),
   notes: z.string().max(50000),
-});
+}).refine((v) => !v.start_date || !v.due_date || v.start_date <= v.due_date, { path: ["start_date"], message: "Start date must not be after the deadline" });
 
 export function TaskFormDialog({ open, onOpenChange, task, projectId, defaults }: {
   open: boolean; onOpenChange: (o: boolean) => void; task?: Task; projectId?: number; defaults?: Partial<Task>;
@@ -200,11 +202,13 @@ export function TaskFormDialog({ open, onOpenChange, task, projectId, defaults }
   const f = useForm({
     project_id: String(task?.project_id ?? projectId ?? ""), milestone_id: String(task?.milestone_id ?? defaults?.milestone_id ?? ""),
     title: task?.title ?? "", description: task?.description ?? "", status: task?.status ?? defaults?.status ?? "todo",
-    priority: task?.priority ?? "medium", due_date: task?.due_date ?? "", tags: (task?.tags ?? []).join(", "),
+    priority: task?.priority ?? "medium", start_date: task?.start_date ?? "", due_date: task?.due_date ?? "",
+    depends_on: task?.depends_on ?? ([] as number[]), tags: (task?.tags ?? []).join(", "),
     git_reference: task?.git_reference ?? "", notes: task?.notes ?? "",
   }, [open, task?.id]);
   const pid = Number(f.values.project_id) || undefined;
   const { data: milestones } = useMilestones(pid);
+  const { data: siblings } = useTasks({ project_id: pid, limit: 200 }, { enabled: !!pid });
   const m = useWrite(
     (b: z.infer<typeof taskSchema>) => (task ? api.updateTask(task.id, b) : api.createTask(b)),
     { success: task ? "Task updated" : "Task created", onSuccess: () => onOpenChange(false) },
@@ -221,6 +225,7 @@ export function TaskFormDialog({ open, onOpenChange, task, projectId, defaults }
       <Field label="Title" required error={e.title} className="sm:col-span-2">{(id) => <Input id={id} value={v.title} onChange={set("title")} autoFocus aria-invalid={!!e.title} />}</Field>
       <Field label="Status">{(id) => <Select id={id} value={v.status} onChange={set("status")} options={TASK_STATUSES} />}</Field>
       <Field label="Priority">{(id) => <Select id={id} value={v.priority} onChange={set("priority")} options={PRIORITIES} />}</Field>
+      <Field label="Start date" error={e.start_date}>{(id) => <Input id={id} type="date" value={v.start_date} onChange={set("start_date")} aria-invalid={!!e.start_date} />}</Field>
       <Field label="Deadline">{(id) => <Input id={id} type="date" value={v.due_date} onChange={set("due_date")} />}</Field>
       <Field label="Milestone">
         {(id) => (
@@ -228,6 +233,22 @@ export function TaskFormDialog({ open, onOpenChange, task, projectId, defaults }
             {milestones?.map((ms) => <option key={ms.id} value={ms.id}>{ms.title}</option>)}
           </Select>
         )}
+      </Field>
+      <Field label="Depends on" hint="Finish-to-start: this task begins after the selected tasks finish" className="sm:col-span-2">
+        {(id) => {
+          const options = (siblings?.items ?? []).filter((x) => x.id !== task?.id && x.project_id === pid);
+          return options.length ? (
+            <div id={id} role="group" className="max-h-32 space-y-0.5 overflow-y-auto rounded-lg border border-input bg-card p-1.5">
+              {options.map((o) => (
+                <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-[13px] hover:bg-accent">
+                  <input type="checkbox" className="accent-[var(--primary)]" checked={v.depends_on.includes(o.id)}
+                    onChange={(ev) => f.setValues((s) => ({ ...s, depends_on: ev.target.checked ? [...s.depends_on, o.id] : s.depends_on.filter((i) => i !== o.id) }))} />
+                  <span className="truncate">{o.title}</span>
+                </label>
+              ))}
+            </div>
+          ) : <p id={id} className="text-xs text-muted-foreground">{t("No other tasks in this project")}</p>;
+        }}
       </Field>
       <Field label="Tags" hint="Comma-separated">{(id) => <Input id={id} value={v.tags} onChange={set("tags")} placeholder="experiment, sim" />}</Field>
       <Field label="Git reference">{(id) => <Input id={id} value={v.git_reference} onChange={set("git_reference")} placeholder="commit SHA, branch or PR URL" />}</Field>

@@ -9,13 +9,13 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth.actor import Actor
 from app.core.enums import OPEN_TASK_STATUSES, PRIORITIES, TASK_STATUSES
 from app.core.errors import NotFound, ValidationFailed
-from app.models import Project, Task, utcnow
+from app.models import Project, Task, TaskDependency, utcnow
 from app.repositories.base import apply_sort, get_or_404, paginate
 from app.schemas.entities import TaskCreate, TaskUpdate
 from app.services.activity import log_event
 from app.services.projects import validate_milestone_belongs
 
-SORTABLE = {"title", "status", "priority", "due_date", "created_at", "updated_at"}
+SORTABLE = {"title", "status", "priority", "start_date", "due_date", "created_at", "updated_at"}
 _PRIORITY_ORDER = case({"critical": 0, "high": 1, "medium": 2, "low": 3}, value=Task.priority, else_=9)
 
 
@@ -98,7 +98,50 @@ def task_to_dict(t: Task) -> dict[str, Any]:
     d["project_slug"] = t.project.slug if t.project else None
     d["project_title"] = t.project.title if t.project else None
     d["milestone_title"] = t.milestone.title if t.milestone else None
+    d["depends_on"] = t.depends_on
     return d
+
+
+def _set_dependencies(db: Session, t: Task, ids: list[int]) -> None:
+    """Replace the task's prerequisites. Prerequisites must be other tasks of the same project and
+    must not create a cycle."""
+    want = list(dict.fromkeys(ids))
+    if t.id in want:
+        raise ValidationFailed("A task cannot depend on itself")
+    if want:
+        rows = db.execute(select(Task.id, Task.project_id).where(Task.id.in_(want))).all()
+        found = {r.id: r.project_id for r in rows}
+        missing = [i for i in want if i not in found]
+        if missing:
+            raise ValidationFailed(f"Unknown prerequisite task id(s): {missing}")
+        foreign = [i for i, pid in found.items() if pid != t.project_id]
+        if foreign:
+            raise ValidationFailed(f"Prerequisite task(s) {foreign} belong to a different project")
+        # Cycle check: t must not be reachable from any prerequisite by following "depends on" edges.
+        edges: dict[int, list[int]] = {}
+        for a, b in db.execute(
+            select(TaskDependency.task_id, TaskDependency.depends_on_id).where(TaskDependency.task_id != t.id)
+        ):
+            edges.setdefault(a, []).append(b)
+        seen: set[int] = set()
+        stack = list(want)
+        while stack:
+            cur = stack.pop()
+            if cur == t.id:
+                raise ValidationFailed("Dependency cycle detected")
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(edges.get(cur, []))
+    if sorted(want) == t.depends_on:
+        return
+    t.dep_links = [TaskDependency(task_id=t.id, depends_on_id=i) for i in sorted(want)]
+    db.flush()
+
+
+def _check_dates(start: date | None, due: date | None) -> None:
+    if start and due and start > due:
+        raise ValidationFailed("start_date must not be after due_date")
 
 
 def get_task(db: Session, actor: Actor, task_id: int) -> Task:
@@ -133,11 +176,15 @@ def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
             # Idempotent retry: update instead of duplicating.
             fields = data.model_dump(exclude_unset=True, exclude={"project_id", "client_key"})
             return update_task(db, actor, existing.id, TaskUpdate(**fields))
-    t = Task(**data.model_dump())
+    fields = data.model_dump()
+    deps = fields.pop("depends_on")
+    t = Task(**fields)
     if t.status == "done":
         t.completed_at = utcnow()
     db.add(t)
     db.flush()
+    if deps:
+        _set_dependencies(db, t, deps)
     log_event(db, actor, project_id=t.project_id, event_type="task_created",
               summary=f"Task created: {t.title}", resource_type="task", resource_id=t.id)
     if t.status == "done":
@@ -158,10 +205,23 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
         get_or_404(db, Project, changes["project_id"], "Project")
         if "milestone_id" not in changes:
             changes["milestone_id"] = None
+        if "depends_on" not in changes and t.depends_on:
+            changes["depends_on"] = []  # prerequisites live in the old project
     validate_milestone_belongs(db, changes.get("project_id", t.project_id), changes.get("milestone_id"))
+    _check_dates(changes.get("start_date", t.start_date), changes.get("due_date", t.due_date))
     old_status = t.status
+    new_deps = changes.pop("depends_on", None)
     for k, v in changes.items():
         setattr(t, k, v)
+    if "project_id" in changes:
+        # Tasks elsewhere that depended on this one would now point across projects.
+        db.query(TaskDependency).filter(TaskDependency.depends_on_id == t.id).delete()
+        db.flush()
+        db.expire(t, ["dep_links"])
+    if new_deps is not None:
+        _set_dependencies(db, t, new_deps)
+    if new_deps is not None:
+        changes["depends_on"] = new_deps
     _status_side_effects(db, actor, t, old_status)
     others = sorted(set(changes) - {"status"})
     if others:

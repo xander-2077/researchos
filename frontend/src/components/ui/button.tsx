@@ -3,12 +3,12 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer select-none",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-[13px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer select-none",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
-        secondary: "border border-border bg-card text-foreground shadow-xs hover:bg-accent",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        secondary: "border border-input bg-card text-foreground hover:bg-accent",
         ghost: "text-muted-foreground hover:bg-accent hover:text-foreground",
         destructive: "bg-destructive text-white shadow-xs hover:bg-destructive/90",
         outline: "border border-border bg-transparent hover:bg-accent",

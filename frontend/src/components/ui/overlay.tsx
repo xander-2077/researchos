@@ -15,17 +15,17 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] data-[state=open]:animate-in" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 data-[state=open]:animate-in" />
         <DialogPrimitive.Content
           className={cn(
-            "fixed left-1/2 top-[8vh] z-50 flex max-h-[84vh] w-[calc(100vw-2rem)] -translate-x-1/2 flex-col rounded-xl border border-border bg-card shadow-2xl focus:outline-none",
+            "fixed left-1/2 top-[8vh] z-50 flex max-h-[84vh] w-[calc(100vw-2rem)] -translate-x-1/2 flex-col rounded-2xl border border-border bg-card shadow-[0_12px_40px_rgb(0_0_0/0.16)] focus:outline-none",
             wide ? "max-w-3xl" : "max-w-lg",
             className,
           )}
         >
           <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-3.5">
             <div>
-              <DialogPrimitive.Title className="text-[15px] font-semibold">{tn(title)}</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="font-serif text-[17px] font-medium">{tn(title)}</DialogPrimitive.Title>
               {description ? (
                 <DialogPrimitive.Description className="mt-0.5 text-xs text-muted-foreground">{tn(description)}</DialogPrimitive.Description>
               ) : (
@@ -79,7 +79,7 @@ export function DropdownContent({ className, align = "end", ...p }: ComponentPro
       <DM.Content
         align={align}
         sideOffset={4}
-        className={cn("z-50 min-w-44 rounded-lg border border-border bg-card p-1 shadow-lg", className)}
+        className={cn("z-50 min-w-44 rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgb(0_0_0/0.12)]", className)}
         {...p}
       />
     </DM.Portal>
@@ -90,7 +90,7 @@ export function DropdownItem({ className, ...p }: ComponentProps<typeof DM.Item>
   return (
     <DM.Item
       className={cn(
-        "flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none data-[highlighted]:bg-accent [&_svg]:size-4 [&_svg]:text-muted-foreground",
+        "flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] outline-none data-[highlighted]:bg-accent [&_svg]:size-4 [&_svg]:text-muted-foreground",
         className,
       )}
       {...p}

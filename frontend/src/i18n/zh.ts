@@ -186,5 +186,18 @@ export const zh: Record<string, string> = {
   "Each metric needs a name and a numeric value": "每个指标都需要名称和数值", "Appended to the project's research log.": "追加到项目的科研日志中。",
   Summary: "摘要", "Details (Markdown)": "详情（Markdown）", "Progress logged": "进展已记录",
   "Finished WBC base compensation; next: sim ablations": "完成 WBC 基座补偿；下一步：仿真消融",
-  
+  // ---------------------------------------------------------------- Gantt
+  Gantt: "甘特图", Zoom: "缩放", Day: "日", Week: "周", Month: "月", "Hide completed": "隐藏已完成",
+  Expand: "展开", Collapse: "收起", "Set dates": "设置日期", d: "天",
+  "Starts before a prerequisite finishes": "开始时间早于前置任务的结束时间",
+  "No tasks to schedule": "没有可排期的任务",
+  "Create tasks with a start date and a deadline to see them here as bars.": "为任务设置开始日期和截止日期后，会在这里显示为条形。",
+  "Drag a bar to reschedule, drag its edges to resize. Keyboard: ←/→ move, Shift+←/→ change the end date, Enter edit.":
+    "拖动条形调整排期，拖动两端调整时长。键盘：←/→ 移动，Shift+←/→ 修改结束日期，Enter 编辑。",
+  "Start date": "开始日期", "Depends on": "前置任务",
+  "Finish-to-start: this task begins after the selected tasks finish": "完成后开始：本任务在所选任务完成后才开始",
+  "No other tasks in this project": "该项目没有其他任务",
+  "Start date must not be after the deadline": "开始日期不能晚于截止日期",
+  "start_date must not be after due_date": "开始日期不能晚于截止日期",
+  "Dependency cycle detected": "检测到循环依赖", "A task cannot depend on itself": "任务不能依赖自身",
 };

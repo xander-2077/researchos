@@ -145,6 +145,7 @@ describe("timeline", () => {
         { id: 12, project_id: 2, project_slug: b.slug, project_title: "Quadruped Soccer", title: "Write method", due_date: todayISO(5), status: "todo", priority: "medium", tags: [] },
       ],
     });
+    localStorage.setItem("researchos-timeline-view", "list");
     renderApp("/timeline");
     expect(await screen.findByText("Sim ablation")).toBeInTheDocument();
     expect(screen.getByText("Write method")).toBeInTheDocument();
@@ -168,7 +169,7 @@ describe("help & docs", () => {
     const link = screen.getAllByRole("link", { name: "MCP integration" }).find((a) => a.closest("article"))!;
     expect(link).toHaveAttribute("href", "/help/mcp-integration");
     await userEvent.click(link);
-    expect(await screen.findByRole("heading", { level: 1, name: /MCP integration: Claude Code/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /MCP 集成：Claude Code 与 Codex/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: /2\. Claude Code/ })).toHaveAttribute("id", "2-claude-code");
   });
 
