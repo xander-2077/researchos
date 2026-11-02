@@ -1,7 +1,7 @@
 # ResearchOS — single container: web UI + REST API + MCP (Streamable HTTP at /mcp)
 # Start:  cp .env.example .env  (set RESEARCHOS_ADMIN_PASSWORD)  &&  docker compose up -d --build
 # Remote access over Tailscale (optional):  docker compose --profile tailscale up -d
-#   → https://<TS_HOSTNAME>.<your-tailnet>.ts.net   (see docs/deployment.md#option-a--tailscale-serve-docker-sidecar)
+#   → https://<TS_HOSTNAME>.<your-tailnet>.ts.net   (see docs/deployment.md#方案-atailscale-内网-https)
 services:
   researchos:
     build:

@@ -197,7 +197,7 @@ export default function HelpPage() {
             <Button size="sm" variant="secondary" onClick={downloadTemplate}><Download /> {doc.template}</Button>
           </div>
         )}
-        {lang === "zh" && doc.slug !== "guide" && (
+        {lang === "zh" && doc.template && (
           <p className="mb-4 rounded-md bg-info/10 px-3 py-2 text-xs text-info">
             {t("This reference document is in English. A Chinese quick guide is available:")}{" "}
             <button type="button" className="cursor-pointer underline" onClick={() => navigate("/help/guide")}>{t("User guide")}</button>

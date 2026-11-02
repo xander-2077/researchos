@@ -1,57 +1,51 @@
-# MCP integration: Claude Code & OpenAI Codex
+# MCP 集成：Claude Code 与 Codex
 
-ResearchOS exposes a **Model Context Protocol** server so coding agents can read and update your
-research state from whatever repository they are working in.
+通过 MCP 查询项目、更新任务、记录实验和进展。
 
-| | |
+| 项目 | 配置 |
 |---|---|
-| Transport | **Streamable HTTP** (primary), stdio (optional, local only) |
-| Endpoint | `https://<your-host>/mcp` (local default: `http://127.0.0.1:8000/mcp`) |
-| Auth | `Authorization: Bearer <token>` — create tokens in **Settings → API & MCP tokens** |
-| Scopes | *Read only* or *Read / Write*. Read-only tokens get `insufficient_scope` on every write tool. |
-| SDK | Official `mcp` Python SDK 2.3 (`MCPServer`, the successor of FastMCP), stateless JSON responses |
+| 传输 | Streamable HTTP；可选本机 stdio |
+| 地址 | `https://<服务器地址>/mcp`；本机默认 `http://127.0.0.1:8000/mcp` |
+| 认证 | `Authorization: Bearer <token>` |
+| 权限 | 只读或读写；只读令牌调用写入工具会返回 `insufficient_scope` |
+| 实现 | Python `mcp` SDK 2.3，`MCPServer`，无状态 JSON 响应 |
 
-The MCP tools call the **same service layer** as the REST API and the web UI, so validation,
-permission checks and activity logging are identical everywhere.
+MCP 与网页、REST API 共用业务层，执行相同的权限校验和活动记录。
+命令示例已按 Claude Code 2.1.316、Codex CLI 0.166.0 核对；HTTP 协议测试见 `backend/tests/test_mcp.py`。
 
-> Verified against **Claude Code 2.1.316** and **Codex CLI 0.166.0** (`claude mcp add --help`,
-> `codex mcp add --help`). The protocol itself is covered by automated tests that use the official
-> MCP client over real HTTP (`backend/tests/test_mcp.py`).
+## 1. 创建令牌
 
----
+在 **设置 → 新建令牌** 中选择权限和有效期。名称包含 `claude` 或 `codex` 时，动态来源会自动标注。令牌仅显示一次。
 
-## 1. Create a token
-
-1. Open ResearchOS → **Settings** → **New token**.
-2. Name it after the agent and machine, e.g. `claude-code-macbook` or `codex-vps`.
-   Token names containing `claude` / `codex` automatically set the activity *Source* to
-   *Claude Code* / *Codex* (you can also send the header `X-ResearchOS-Source: claude_code|codex`).
-3. Choose **Read / Write** (or *Read only* for query-only agents) and an expiry.
-4. Copy the token (`ros_…`) — it is shown **once**. Put it in an environment variable:
+在运行智能体的环境中设置：
 
 ```bash
-# ~/.zshrc or ~/.bashrc (never commit tokens to git)
+# 可加入 ~/.zshrc 或 ~/.bashrc；不要提交到 Git
 export RESEARCHOS_TOKEN="ros_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
-CLI alternative (on the server): `python -m app.cli create-token claude-code-macbook --write`
-(Docker: `docker compose exec researchos python -m app.cli create-token claude-code-macbook --write`).
+也可在服务器创建：
 
----
+```bash
+docker compose exec researchos python -m app.cli create-token codex-vps --write --days 90
+```
+
+省略 `--write` 创建只读令牌。后续示例中的域名需替换为实际访问地址。
 
 ## 2. Claude Code
 
-### Option A — user-wide (all repositories)
+### 所有仓库共用
 
 ```bash
 claude mcp add --transport http --scope user researchos https://research.example.com/mcp \
   --header "Authorization: Bearer $RESEARCHOS_TOKEN"
 ```
 
-Note: this stores the expanded token value in your user config (`~/.claude.json`). To keep the
-token out of config files, use the project file below with `${RESEARCHOS_TOKEN}` expansion.
+此命令将令牌值保存到 `~/.claude.json`。若希望配置文件只引用环境变量，使用下面的仓库配置。
 
-### Option B — per repository (`.mcp.json`, safe to commit)
+### 单个仓库
+
+在仓库根目录创建 `.mcp.json`：
 
 ```json
 {
@@ -68,114 +62,85 @@ token out of config files, use the project file below with `${RESEARCHOS_TOKEN}`
 }
 ```
 
-Claude Code expands `${RESEARCHOS_TOKEN}` from the environment, so the file contains no secret.
+Claude Code 从环境变量读取令牌；此文件不含令牌值，可提交到 Git。
 
-### Verify
+### 检查 Claude Code 连接
 
 ```bash
-claude mcp list          # researchos … ✓ Connected
+claude mcp list
 claude mcp get researchos
 ```
 
-Inside a session, `/mcp` shows the server and its 8 tools.
+在会话中输入 `/mcp`，检查服务连接及工具列表。
 
-### Example prompts
+## 3. Codex
 
-- “List my ResearchOS projects and tell me which ones are blocked.” → `list_projects`
-- “Record today's progress on humanoid-wbm: finished the WBC base-compensation module; next is the
-  simulation ablation.” → `log_progress`
-- “Record this ablation run (no world model, seed 0, commit `abc1234`, goal_rate 0.52) in
-  quadruped-soccer.” → `record_experiment`
-- “What unfinished tasks are due in the next 7 days across all projects?” → `query_work`
-
----
-
-## 3. OpenAI Codex (CLI / IDE)
-
-### Register the server
+### 注册服务
 
 ```bash
 codex mcp add researchos --url https://research.example.com/mcp --bearer-token-env-var RESEARCHOS_TOKEN
 ```
 
-This writes to `~/.codex/config.toml`:
+对应的 `~/.codex/config.toml` 配置：
 
 ```toml
 [mcp_servers.researchos]
 url = "https://research.example.com/mcp"
 bearer_token_env_var = "RESEARCHOS_TOKEN"
-# optional: tag activity explicitly (otherwise inferred from the token name)
+# 可选：明确标注动态来源
 http_headers = { "X-ResearchOS-Source" = "codex" }
 ```
 
-Codex reads the token from `RESEARCHOS_TOKEN` at runtime; the config file holds no secret.
+启动 Codex 的进程必须能读取 `RESEARCHOS_TOKEN`；仅在另一个终端设置变量不会传给已运行的应用。
 
-### Verify
+### 检查 Codex 连接
 
 ```bash
-codex mcp list             # researchos  https://…/mcp  RESEARCHOS_TOKEN  enabled  Bearer token
+codex mcp list
 codex mcp get researchos
 ```
 
-Then start `codex` and type `/mcp` to see the connected tools, or ask:
-“Use researchos to list my projects.”
+新开会话，在 CLI 中输入 `/mcp`，或发送：“用 researchos 列出我的项目。”
 
----
+## 4. 仓库指令
 
-## 4. Tell the agent *when* to use it
+将 [CLAUDE.md 模板](../templates/CLAUDE.md) 或 [AGENTS.md 模板](../templates/AGENTS.md) 复制到科研仓库根目录，填写项目短标识。也可设置 `RESEARCHOS_PROJECT` 供智能体参考。
 
-Copy the templates into each research repository and set the project slug:
+模板约定：先读项目上下文，记录有效进展，使用稳定 ID 写入任务和实验；不自行验证结果，不上传密钥，服务不可用时继续本地工作。
 
-- `templates/CLAUDE.md` → `<repo>/CLAUDE.md` (Claude Code)
-- `templates/AGENTS.md` → `<repo>/AGENTS.md` (Codex)
+示例指令：
 
-Both say: read context first, log meaningful progress, record experiments with stable ids, never
-mark results verified, don't spam tiny edits, never overwrite confirmed conclusions, don't block
-coding when ResearchOS is down, and never send secrets. The project can also be set per shell via
-`export RESEARCHOS_PROJECT=quadruped-soccer`.
+- “列出所有受阻项目。”
+- “记录今天的进展：完成 WBC 基座补偿，下一步做仿真消融。”
+- “记录消融运行：去掉世界模型，seed 0，提交 abc1234，goal_rate 0.52。”
+- “列出未来 7 天到期的未完成任务。”
 
----
+## 5. 工具与权限
 
-## 5. Tool reference
-
-| Tool | Kind | Purpose |
+| 工具 | 类型 | 用途 |
 |---|---|---|
-| `list_projects` | read | Portfolio: stage, health, milestone progress, next deadline, next action, blockers. Filters: `stage`, `health_status`, `priority`, `archived`. |
-| `get_project` | read | One project by id or slug. Concise by default; `include` any of `milestones`, `tasks`, `experiments`, `progress`, `deadlines`. |
-| `query_work` | read | Cross-project query for `task` / `milestone` / `experiment` / `deadline` with `project`, `status`, `due_before`, `due_after`, `priority`, `keyword`, `limit` (≤100). Defaults to unfinished items. |
-| `upsert_task` | write, idempotent | Create or update a task (by `task_id` or `client_key`). Only passed fields change. |
-| `upsert_milestone` | write, idempotent | Create or update a milestone. |
-| `record_experiment` | write, idempotent | Upsert experiment (`experiment_key`) + optional run (`external_run_id`) atomically. New results → `needs_review`. |
-| `log_progress` | write, append-only | Add a progress note to the research log. |
-| `update_project` | write | Stage, health, priority, next action, blockers, venue, deadline. `research_stage="completed"` requires `confirm=true`. |
+| `list_projects` | 读取 | 查询项目阶段、健康度、进度、截止日期和阻塞；支持阶段、健康度、优先级和归档筛选 |
+| `get_project` | 读取 | 按 ID 或短标识查询项目；`include` 可包含 `milestones`、`tasks`、`experiments`、`progress`、`deadlines` |
+| `query_work` | 读取 | 跨项目查询任务、里程碑、实验和截止日期；支持状态、日期、优先级、关键词；默认查未完成项，最多 100 条 |
+| `upsert_task` | 写入 | 按 `task_id` 或 `client_key` 创建或更新任务，仅修改传入字段；支持 `start_date`（甘特图条形起点）和 `depends_on`（同项目前置任务 id 列表，整体替换，`[]` 清空；自依赖、跨项目、循环依赖会被拒绝） |
+| `upsert_milestone` | 写入 | 创建或更新里程碑 |
+| `record_experiment` | 写入 | 按 `experiment_key` 写入实验，可同时按 `external_run_id` 写入运行；新增结果为待审核 |
+| `log_progress` | 写入 | 追加进展记录 |
+| `update_project` | 写入 | 更新阶段、健康度、优先级、下一步、阻塞和投稿信息；完成项目需 `confirm=true` |
 
-Every write returns the resource ids and a human-readable `summary`, and is recorded in the
-Activity log with the source (*Claude Code*, *Codex*, *MCP agent*).
+写入返回资源 ID 和 `summary`，并在动态中记录来源。
 
-### Safety guarantees (enforced server-side, not just by prompts)
+服务端限制：
 
-- Agents **cannot** set `verified` on experiments or runs (`verification_requires_human`).
-- Changing a verified experiment/run requires `confirm_overwrite_verified=true` and drops it back
-  to `needs_review` (`verified_protected`).
-- Completing/archiving a project or changing its research question/hypothesis requires
-  `confirm=true` (`confirmation_required`).
-- Runs are unique per `(experiment, external_run_id)`; tasks per `(project, client_key)`.
-- Query tools never write; result sizes are capped.
-- Agents cannot delete experiments or runs (UI only).
+- 智能体不能将实验或运行设为 `verified`。
+- 修改已验证结果需 `confirm_overwrite_verified=true`，修改后回到待审核状态。
+- 智能体完成或归档项目、改写已有研究问题或假设，需 `confirm=true`。
+- 任务按 `(project_id, client_key)`、实验按 `(project_id, experiment_key)`、运行按 `(experiment_id, external_run_id)` 去重。
+- 读取工具不写入数据；MCP 不提供实验或运行删除工具。
 
-### Errors
+## 6. 本机 stdio 接入
 
-Errors come back as tool errors with a code and a fix hint, e.g.
-`[insufficient_scope] This token is read-only…`, `[not_found] Project 'x' not found. Use list_projects…`,
-`[validation_error] external_run_id is required when recording run data…`.
-
----
-
-## 6. stdio transport (optional, same machine only)
-
-For an agent on the same machine as the database, the stdio adapter runs the same MCP server and
-services directly against the SQLite file (WAL mode allows this alongside the web server). It
-still requires a valid token so scopes and audit logging apply.
+智能体与数据库在同一台机器时，可通过 stdio 直接调用相同业务层。仍需有效令牌。SQLite WAL 支持与网页服务同时访问。
 
 ```bash
 # Claude Code
@@ -193,19 +158,21 @@ codex mcp add researchos-local \
   -- /path/to/researchos/backend/.venv/bin/python -m app.mcp.stdio
 ```
 
-With Docker deployments prefer HTTP (`http://127.0.0.1:8000/mcp`) — the database lives in a volume.
+Docker 部署优先使用 HTTP，数据库保存在容器数据卷中。
 
-## 7. Troubleshooting
+## 7. 排障
 
-| Symptom | Fix |
+| 错误或现象 | 检查项 |
 |---|---|
-| `401` / “Bearer token required” | Token env var not set in the agent's environment, revoked or expired. |
-| `insufficient_scope` | Token is read-only; create a Read/Write token. |
-| `421 Misdirected` / host rejected | `RESEARCHOS_MCP_ALLOWED_HOSTS` is set and doesn't include the Host you use. |
-| `429` | Rate limit (`RESEARCHOS_RATE_LIMIT_PER_MINUTE`). |
-| Agent writes don't appear in UI | The UI refreshes every 30 s and on focus; reload. Check *Activity* filtered by source. |
+| `401` / `Bearer token required` | 令牌是否传入、过期或被撤销 |
+| `insufficient_scope` | 是否使用读写令牌 |
+| `421 Misdirected` | `RESEARCHOS_MCP_ALLOWED_HOSTS` 是否包含当前 Host |
+| `429` | 请求频率是否超过 `RESEARCHOS_RATE_LIMIT_PER_MINUTE` |
+| `not_found` | 用 `list_projects` 核对项目 ID 或短标识 |
+| `validation_error` | 按错误提示检查必填字段和格式 |
+| 网页未更新 | 手动刷新，并在“动态”中按来源查询；页面每 30 秒及切回窗口时自动刷新 |
 
-Manual check with curl:
+检查 HTTP 握手：
 
 ```bash
 curl -s https://research.example.com/mcp \

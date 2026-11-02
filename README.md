@@ -128,7 +128,7 @@ scripts/restore.sh backups/researchos-<ts>.db   # stops the container, keeps a p
 ```
 
 JSON export: *Settings → Export JSON* or `GET /api/v1/export`. Details and cron example in
-[docs/deployment.md](docs/deployment.md#5-backup--restore).
+[docs/deployment.md](docs/deployment.md#5-备份与恢复).
 
 ## Upgrading / database migrations
 

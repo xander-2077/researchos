@@ -1,104 +1,92 @@
-# Deployment
+# 部署
 
-ResearchOS runs as **one container** (web UI + REST + MCP) with one Docker volume for the SQLite
-database. It works the same on macOS (Docker Desktop / OrbStack), a Linux workstation, or a VPS.
+ResearchOS 使用一个容器提供网页、REST API 和 MCP，SQLite 数据保存在 Docker 数据卷中。支持 macOS（Docker Desktop / OrbStack）、Linux 和 VPS。
 
-## 1. Requirements
+## 1. 环境要求
 
-* Docker Engine 24+ with the Compose plugin (`docker compose version`)
-* ~300 MB disk for the image, ~100 MB RAM at runtime
-* For development without Docker: Python 3.11+ and Node 20+
+- Docker Engine 24+ 和 Compose 插件：`docker compose version`。
+- 原部署估算：镜像约 300 MB，运行内存约 100 MB；以实际构建和运行占用为准。
+- 不使用 Docker 开发时，需要 Python 3.11+ 和 Node 20+。
 
-## 2. Local machine (macOS / Linux)
+## 2. 本机部署
 
 ```bash
-git clone <your-repo-url> researchos && cd researchos
+git clone <仓库地址> researchos && cd researchos
 cp .env.example .env
-# edit .env: set RESEARCHOS_ADMIN_PASSWORD to a long password (≥10 chars)
+# 编辑 .env，将 RESEARCHOS_ADMIN_PASSWORD 设置为至少 10 个字符的密码
 docker compose up -d --build
-docker compose ps            # STATUS should become "healthy"
-open http://127.0.0.1:8000   # Linux: xdg-open
+docker compose ps           # 状态应为 healthy
 ```
 
-The port is bound to `127.0.0.1` only. Data lives in the named volume `researchos-data`.
+打开 `http://127.0.0.1:8000`。默认仅监听本机，数据卷为 `researchos-data`。
 
-After the first successful login you may delete `RESEARCHOS_ADMIN_PASSWORD` from `.env`; the
-admin user stays in the database. Reset a password any time:
+管理员创建后可从 `.env` 删除初始密码。重置密码：
 
 ```bash
 docker compose exec researchos python -m app.cli set-password
 ```
 
-## 3. VPS (fresh Ubuntu/Debian server)
+## 3. 远程访问
+
+服务器先安装 Docker，再按“本机部署”启动应用。Ubuntu / Debian 可使用：
 
 ```bash
-# 1. Docker
 curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER && newgrp docker
-
-# 2. App
-git clone <your-repo-url> /opt/researchos && cd /opt/researchos
-cp .env.example .env
-nano .env        # set RESEARCHOS_ADMIN_PASSWORD; set RESEARCHOS_COOKIE_SECURE=true if you use HTTPS
-docker compose up -d --build
-curl -s http://127.0.0.1:8000/api/v1/healthz     # {"status":"ok"}
+sudo usermod -aG docker "$USER"
+newgrp docker
 ```
 
-Keep `RESEARCHOS_BIND=127.0.0.1` and put one of the following in front. **Never publish port
-8000 directly to the internet.**
+检查应用状态：
 
-### Option A — Tailscale Serve (Docker sidecar)
+```bash
+curl -s http://127.0.0.1:8000/api/v1/healthz   # {"status":"ok"}
+```
 
-Recommended: private HTTPS access from your own devices only, no open ports, no root on the
-server. The `tailscale` service in `docker-compose.yml` (profile `tailscale`) joins your tailnet
-as its own machine and uses **Tailscale Serve** to proxy `https://<name>.<tailnet>.ts.net` to the
-ResearchOS container. It runs in userspace networking mode (no `/dev/net/tun`, no host changes)
-and keeps its identity in the `researchos-tailscale-state` volume.
+保留 `RESEARCHOS_BIND=127.0.0.1`，通过以下方式访问；不要直接将 8000 端口暴露到公网。
 
-1. In the [Tailscale admin console](https://login.tailscale.com/admin/dns) enable **MagicDNS** and
-   **HTTPS Certificates** (one time per tailnet).
-2. Optionally set the machine name in `.env`: `TS_HOSTNAME=researchos` (default).
-3. Start it:
+### 方案 A：Tailscale 内网 HTTPS
+
+**宿主机已登录 Tailscale** 时，可直接转发本机服务。先检查已有规则，选择未占用端口：
+
+```bash
+tailscale serve status
+tailscale serve --bg --https=8443 http://127.0.0.1:8000
+```
+
+使用命令输出的 HTTPS 地址。停止此入口：`tailscale serve --https=8443 off`。
+
+**使用 Docker 独立节点** 时，启用 Compose 的 `tailscale` 配置。该容器以用户态网络运行，身份保存在 `researchos-tailscale-state` 卷中。
+
+1. 在 [Tailscale 管理后台](https://login.tailscale.com/admin/dns)开启 **MagicDNS** 和 **HTTPS Certificates**。
+2. 可在 `.env` 设置 `TS_HOSTNAME=researchos`。
+3. 启动并打开日志中的登录链接完成授权：
 
    ```bash
    docker compose --profile tailscale up -d
-   docker compose logs tailscale | grep -A1 "To authenticate"   # open this URL and approve (it stays valid; no timeout)
+   docker compose logs tailscale
    ```
 
-   For unattended setups put a pre-auth key in `.env` instead (`TS_AUTHKEY=tskey-auth-…`,
-   create it under *Settings → Keys*) and remove it after the first start.
-4. Check status and the URL:
+   无人值守部署可在 `.env` 设置 `TS_AUTHKEY`，首次登录成功后移除。
+4. 检查节点与访问地址：
 
    ```bash
    docker compose exec tailscale tailscale status
    docker compose exec tailscale tailscale serve status
    ```
 
-5. Open `https://researchos.<your-tailnet>.ts.net` on any device logged into the same tailnet
-   (laptop, phone with the Tailscale app). The first HTTPS request can take a few seconds while the
-   certificate is issued.
+5. 在同一 tailnet 的设备上打开 `https://researchos.<tailnet>.ts.net`。首次访问可能需要等待证书签发。
 
-Agents on tailnet machines use `https://researchos.<your-tailnet>.ts.net/mcp`.
+MCP 地址为访问地址加 `/mcp`。两种部署方式均使用 Serve 提供内网访问；启用 Funnel 会变为公网访问。
 
-Notes:
+- HTTPS 部署设置 `RESEARCHOS_COOKIE_SECURE=true`，修改后运行 `docker compose up -d researchos`。
+- 用 Tailscale ACL 限制可访问的设备或用户。节点标签可通过 `TS_EXTRA_ARGS=--advertise-tags=tag:researchos` 设置，认证密钥需允许该标签。
+- 停止独立节点入口：`docker compose --profile tailscale stop tailscale`。
+- 要让后续 Compose 命令持续管理独立节点，在 `.env` 设置 `COMPOSE_PROFILES=tailscale`。
+- 删除独立节点时，先停止容器，再删除其状态卷及管理后台中的节点；保留 ResearchOS 数据卷。
 
-* Serve is tailnet-only. **Funnel (public internet) is explicitly disabled** in
-  `docker/tailscale/serve.json`; keep it that way.
-* Traffic is end-to-end encrypted (WireGuard + HTTPS). You may set `RESEARCHOS_COOKIE_SECURE=true`;
-  if you also use an `ssh -L` tunnel to `http://127.0.0.1`, most browsers still accept Secure
-  cookies on localhost, but Safari may not — leave it `false` in that case.
-* To restrict which tailnet users/devices can reach it, use Tailscale ACLs (tag the machine, e.g.
-  `TS_EXTRA_ARGS=--advertise-tags=tag:researchos` with a pre-auth key that allows the tag).
-* Stop remote access: `docker compose --profile tailscale stop tailscale` (ResearchOS keeps running).
-  Remove the machine from the tailnet: `docker compose --profile tailscale down` + delete the
-  `researchos-tailscale-state` volume + remove it in the admin console.
+### 方案 B：Caddy 公网 HTTPS
 
-Alternative without Docker: install Tailscale on the host (`curl -fsSL https://tailscale.com/install.sh | sh`,
-`sudo tailscale up`, `sudo tailscale serve --bg <RESEARCHOS_PORT>`).
-
-### Option B — Public HTTPS with Caddy
-
-`/etc/caddy/Caddyfile`:
+安装 Caddy，为域名配置 DNS，并在 `/etc/caddy/Caddyfile` 中设置：
 
 ```caddy
 research.example.com {
@@ -108,17 +96,22 @@ research.example.com {
 ```
 
 ```bash
-sudo apt install -y caddy && sudo systemctl reload caddy
+sudo apt install -y caddy
+sudo systemctl reload caddy
 ```
 
-Caddy obtains certificates automatically. In `.env` set:
+Caddy 自动申请证书。应用 `.env` 配置：
 
-```
+```dotenv
 RESEARCHOS_COOKIE_SECURE=true
 RESEARCHOS_MCP_ALLOWED_HOSTS=["research.example.com","research.example.com:443"]
 ```
 
-### Option C — nginx
+运行 `docker compose up -d researchos` 使配置生效。
+
+### 方案 C：nginx 公网 HTTPS
+
+先准备域名证书，再配置反向代理：
 
 ```nginx
 server {
@@ -132,18 +125,17 @@ server {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;            # MCP may stream responses
+        proxy_buffering off;            # 允许 MCP 流式响应
         proxy_read_timeout 300s;
     }
 }
 ```
 
-Recommended for public hosts: firewall (`ufw allow 22,80,443/tcp`), strong admin password,
-short token expiries, revoke tokens you no longer use.
+应用与 Caddy 方案相同的 `.env` 设置。公网服务器应限制开放端口、使用强密码，并及时撤销不用的令牌。
 
-## 4. Tokens for agents
+## 4. 智能体令牌
 
-Create them in the UI (**Settings → New token**) or on the server:
+在 **设置 → 新建令牌** 创建，或使用命令行：
 
 ```bash
 docker compose exec researchos python -m app.cli create-token codex-vps --write --days 90
@@ -151,73 +143,78 @@ docker compose exec researchos python -m app.cli list-tokens
 docker compose exec researchos python -m app.cli revoke-token 3
 ```
 
-Then follow [mcp-integration.md](mcp-integration.md).
+接入步骤见 [MCP 集成](mcp-integration.md)。
 
-## 5. Backup & restore
+## 5. 备份与恢复
 
-Backups use SQLite's online backup API, which is consistent even while the server is writing
-(WAL mode). Never copy `researchos.db` with `cp` while the server runs.
+备份脚本使用 SQLite 在线备份接口。服务运行时不要直接用 `cp` 复制数据库文件。
 
 ```bash
-scripts/backup.sh                                   # → ./backups/researchos-<UTC>.db
+scripts/backup.sh                         # 保存至 ./backups/researchos-<UTC时间>.db
 scripts/restore.sh backups/researchos-20261102T120000Z.db
 ```
 
-`restore.sh` stops the container, saves the current DB as `researchos.db.pre-restore-<ts>` in
-the volume, restores, runs migrations and starts the container again.
+恢复脚本会停止应用，将当前数据库保存为 `researchos.db.pre-restore-<时间>`，再恢复备份、执行迁移并启动应用。
 
-Nightly backups via cron (host):
+可在宿主机配置每日备份：
 
 ```cron
 15 3 * * *  cd /opt/researchos && scripts/backup.sh >> backups/backup.log 2>&1
 ```
 
-Copy `./backups` off the machine (e.g. `rclone`, `restic`, `rsync`). A JSON export (for
-migration/inspection, no credentials) is available in **Settings → Export JSON**, at
-`GET /api/v1/export`, or via `docker compose exec researchos python -m app.cli export`.
+先创建 `backups` 目录；执行时间使用宿主机时区。定期将备份复制到其他机器。
 
-Volume-level copy (server stopped): `docker run --rm -v researchos-data:/data -v $PWD:/b alpine tar czf /b/researchos-data.tgz -C /data .`
+科研数据 JSON 导出不含凭据，支持 **设置 → 导出 JSON**、`GET /api/v1/export` 或：
 
-## 6. Upgrading
+```bash
+docker compose exec researchos python -m app.cli export
+```
+
+完整数据卷备份需先停止应用：
+
+```bash
+docker compose stop researchos
+docker run --rm -v researchos-data:/data -v "$PWD:/b" alpine tar czf /b/researchos-data.tgz -C /data .
+docker compose start researchos
+```
+
+## 6. 升级
 
 ```bash
 cd /opt/researchos
-scripts/backup.sh                 # always back up first
 git pull
-docker compose up -d --build      # migrations run automatically on start (RESEARCHOS_AUTO_MIGRATE=true)
+scripts/update.sh   # 备份、重新构建并等待服务健康
 docker compose exec researchos python -m app.cli db-version
 ```
 
-To run migrations manually instead, set `RESEARCHOS_AUTO_MIGRATE=false` and run
-`docker compose exec researchos python -m app.cli migrate`.
+默认启动时自动迁移数据库。手动迁移时设置 `RESEARCHOS_AUTO_MIGRATE=false`，再执行 `docker compose exec researchos python -m app.cli migrate`。
 
-## 7. Development mode (no Docker)
+## 7. 开发模式
 
 ```bash
-scripts/setup-dev.sh                                  # venv + npm ci
+scripts/setup-dev.sh                         # 创建虚拟环境并安装依赖
 export RESEARCHOS_ADMIN_PASSWORD='dev-password-123'
-scripts/dev.sh                                        # API :8000 (reload) + Vite :5173
+scripts/dev.sh                              # 后端 :8000，前端 :5173
 ```
 
-Open http://127.0.0.1:5173 (Vite proxies `/api` and `/mcp` to the backend). Data goes to
-`backend/data/` (override with `RESEARCHOS_DATA_DIR`).
+打开 `http://127.0.0.1:5173`。Vite 将 `/api` 和 `/mcp` 转发到后端。数据默认存入 `backend/data/`，可通过 `RESEARCHOS_DATA_DIR` 修改。
 
-## 8. Configuration reference
+## 8. 配置项
 
-| Variable | Default | Meaning |
+| 环境变量 | 默认值 | 用途 |
 |---|---|---|
-| `RESEARCHOS_DATA_DIR` | `./data` (`/data` in Docker) | Database, session key, in-volume backups |
-| `RESEARCHOS_DATABASE_URL` | `sqlite:///<data_dir>/researchos.db` | SQLAlchemy URL |
-| `RESEARCHOS_AUTO_MIGRATE` | `true` | Run Alembic upgrade on startup |
-| `RESEARCHOS_ADMIN_USERNAME` / `_PASSWORD` | `admin` / – | Bootstrap admin if no user exists |
-| `RESEARCHOS_SECRET_KEY` | generated | Session signing key (persisted in data dir) |
-| `RESEARCHOS_COOKIE_SECURE` | `false` | `Secure` cookies (set `true` behind HTTPS) |
-| `RESEARCHOS_SESSION_MAX_AGE_DAYS` | `14` | Session lifetime |
-| `RESEARCHOS_CORS_ORIGINS` | `[]` | Extra browser origins (JSON list) |
-| `RESEARCHOS_MCP_ALLOWED_HOSTS` | `[]` | MCP Host allow-list; empty disables the check |
-| `RESEARCHOS_RATE_LIMIT_PER_MINUTE` | `600` | Per-IP limit for `/api` and `/mcp` (0 = off) |
-| `RESEARCHOS_LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | Per-IP login attempts |
-| `RESEARCHOS_MAX_BODY_BYTES` | `1000000` | Max request body |
-| `RESEARCHOS_BIND` / `RESEARCHOS_PORT` | `127.0.0.1` / `8000` | Compose port binding |
-| `TS_HOSTNAME` / `TS_AUTHKEY` / `TS_EXTRA_ARGS` | `researchos` / – / – | Tailscale sidecar (profile `tailscale`) |
-| `PIP_INDEX_URL` | `https://pypi.tuna.tsinghua.edu.cn/simple` | PyPI mirror used by `docker compose build` (use `https://pypi.org/simple` outside mainland China) |
+| `RESEARCHOS_DATA_DIR` | `./data`，Docker 内为 `/data` | 数据库、会话密钥和备份目录 |
+| `RESEARCHOS_DATABASE_URL` | `sqlite:///<data_dir>/researchos.db` | 数据库连接地址 |
+| `RESEARCHOS_AUTO_MIGRATE` | `true` | 启动时迁移数据库 |
+| `RESEARCHOS_ADMIN_USERNAME` / `RESEARCHOS_ADMIN_PASSWORD` | `admin` / 无 | 首次创建管理员 |
+| `RESEARCHOS_SECRET_KEY` | 自动生成 | 会话签名密钥，保存在数据目录 |
+| `RESEARCHOS_COOKIE_SECURE` | `false` | HTTPS 部署设为 `true` |
+| `RESEARCHOS_SESSION_MAX_AGE_DAYS` | `14` | 会话有效天数 |
+| `RESEARCHOS_CORS_ORIGINS` | `[]` | 允许的额外浏览器来源，JSON 列表 |
+| `RESEARCHOS_MCP_ALLOWED_HOSTS` | `[]` | MCP Host 白名单；空列表不启用检查 |
+| `RESEARCHOS_RATE_LIMIT_PER_MINUTE` | `600` | 每个 IP 的 API/MCP 每分钟请求上限；0 表示关闭 |
+| `RESEARCHOS_LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | 每个 IP 的每分钟登录请求上限 |
+| `RESEARCHOS_MAX_BODY_BYTES` | `1000000` | 请求体大小上限，字节 |
+| `RESEARCHOS_BIND` / `RESEARCHOS_PORT` | `127.0.0.1` / `8000` | Compose 监听地址与端口 |
+| `TS_HOSTNAME` / `TS_AUTHKEY` / `TS_EXTRA_ARGS` | `researchos` / 无 / 无 | Tailscale 独立节点名称、认证密钥和附加参数 |
+| `PIP_INDEX_URL` | `https://pypi.tuna.tsinghua.edu.cn/simple` | 构建镜像时使用的 PyPI 镜像源 |
