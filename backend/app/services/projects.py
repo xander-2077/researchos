@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -37,7 +37,9 @@ STAGE_LABEL = {
 
 def slugify(text: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    return (s or "project")[:70].strip("-")
+    s = (s or "project")[:70].strip("-") or "project"
+    # An all-digit slug would be indistinguishable from a project id ("/projects/1").
+    return f"project-{s}" if s.isdigit() else s
 
 
 def _unique_slug(db: Session, base: str) -> str:
@@ -49,12 +51,16 @@ def _unique_slug(db: Session, base: str) -> str:
 
 
 def resolve_project(db: Session, ref: int | str) -> Project:
-    """Find a project by numeric id or slug."""
+    """Find a project by numeric id or slug.
+
+    A reference made only of digits is *always* an id; slugs can never be all digits
+    (enforced on create/update and by migration 0002), so the two namespaces cannot collide."""
     project: Project | None = None
-    if isinstance(ref, int) or (isinstance(ref, str) and ref.isdigit()):
-        project = db.get(Project, int(ref))
-    if project is None and isinstance(ref, str):
-        project = db.scalar(select(Project).where(Project.slug == ref.strip().lower()))
+    ref_s = str(ref).strip()
+    if ref_s.isdigit():
+        project = db.get(Project, int(ref_s))
+    else:
+        project = db.scalar(select(Project).where(Project.slug == ref_s.lower()))
     if project is None:
         raise NotFound(
             f"Project '{ref}' not found. Use list_projects (MCP) or GET /api/v1/projects to see valid ids/slugs."
@@ -120,9 +126,28 @@ def update_project(db: Session, actor: Actor, project_id: int, data: ProjectUpda
             raise Conflict(f"Slug '{changes['slug']}' is already in use")
 
     old_stage, old_health = project.stage, project.health_status
+    if expected_version is not None:
+        # Atomic compare-and-swap. The check above only catches *stale reads*; two requests that both
+        # read version N would otherwise both pass it. The conditional UPDATE is evaluated by SQLite
+        # under the write lock, so exactly one of them wins and the others get a 409.
+        res = db.execute(
+            update(Project)
+            .where(Project.id == project.id, Project.version == expected_version)
+            .values(version=Project.version + 1)
+            .execution_options(synchronize_session=False)
+        )
+        if res.rowcount != 1:
+            db.rollback()
+            current = db.scalar(select(Project.version).where(Project.id == project_id))
+            raise Conflict(
+                "Project was modified by someone else. Reload and retry.",
+                details={"current_version": current},
+            )
+        db.refresh(project, attribute_names=["version"])
+    else:
+        project.version = Project.version + 1  # SQL-side increment: concurrent updates never lose a bump
     for k, v in changes.items():
         setattr(project, k, v)
-    project.version += 1
 
     if "stage" in changes:
         log_event(

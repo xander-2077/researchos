@@ -177,15 +177,24 @@ def query_work(
              "name": e.name, "group": e.group_name, "status": e.status, "runs": len(e.runs),
              "updated_at": e.updated_at} for e in rows]}
     if resource_type == "deadline":
+        # Fetch *all* matching dates first (limit=None); priority/keyword/status filters and `total` must
+        # be computed before truncating to `limit`, otherwise matching items beyond the first `limit`
+        # dates are silently dropped.
         items = deadlines_between(
             db, actor, due_after or date.today(), due_before, include_overdue=due_after is None,
-            project_id=project_id, limit=limit,
+            project_id=project_id, limit=None,
         )
         if priority:
-            items = [i for i in items if i["priority"] in priority.split(",")]
+            wanted = set(priority.split(","))
+            items = [i for i in items if i["priority"] in wanted]
+        if status:
+            wanted_status = set(status.split(","))
+            items = [i for i in items if i["status"] in wanted_status]
         if keyword:
             items = [i for i in items if keyword.lower() in i["title"].lower()]
-        return {"resource_type": "deadline", "total": len(items), "items": [
+        total = len(items)
+        items = items[:limit]
+        return {"resource_type": "deadline", "total": total, "items": [
             {"kind": i["kind"], "id": i["id"], "project": i["project_slug"], "title": i["title"],
              "due_date": i["due_date"], "status": i["status"], "overdue": i["overdue"], "days_left": i["days_left"]}
             for i in items]}

@@ -44,6 +44,7 @@ export const zh: Record<string, string> = {
   "Project was modified by someone else. Reload and retry.": "项目已被其他人修改，请刷新后重试。",
   "Experiments can only be deleted from the web UI.": "实验只能在网页界面中删除。", "Internal server error": "服务器内部错误",
   // views added later
+  "Mixed units": "单位不一致", "Runs report this metric in different units ({units}); convert to one unit to compare.": "各次运行的该指标单位不同（{units}），请先换算成同一单位再比较。",
   View: "视图", Calendar: "日历", "Previous month": "上个月", "Next month": "下个月", "+{n} more": "还有 {n} 项",
   "Click a day to see its items": "点击日期查看当日事项",
   Help: "帮助", Documentation: "文档", "User guide": "使用指南", "MCP integration": "MCP 集成", Deployment: "部署",

@@ -45,7 +45,8 @@ def get_actor(request: Request, db: Session = Depends(get_db)) -> Actor:
         if not expected or not secrets.compare_digest(expected, got):
             raise Forbidden("Missing or invalid CSRF token", code="csrf_failed")
     user = db.get(User, uid)
-    if user is None:
+    if user is None or request.session.get("sv") != user.session_version:
+        # unknown user, or the password was changed after this session was issued
         request.session.clear()
         raise Unauthorized("Session expired")
     actor = Actor(kind="user", name=user.username, source="manual")

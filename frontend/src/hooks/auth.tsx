@@ -37,7 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await api.logout().catch(() => undefined);
     setCsrfToken(null);
-    qc.clear();
+    // Do NOT use qc.clear(): it removes the "me" query that AuthProvider is subscribed to, so the
+    // "signed out" state written afterwards would go to a new query nobody observes and the UI
+    // would never leave the app. Drop only the research data and update "me" in place.
+    await qc.cancelQueries();
+    qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
     qc.setQueryData<Me>(["me"], { authenticated: false });
   }, [qc]);
 

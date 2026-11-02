@@ -216,6 +216,24 @@ describe("kanban drag", () => {
   });
 });
 
+describe("logout", () => {
+  it("signs out from the sidebar, shows the login page and drops cached data", async () => {
+    state = installFakeApi({ projects: [makeProject({ id: 1, title: "Quadruped Soccer" })] });
+    renderApp();
+    const user = userEvent.setup();
+    expect(await screen.findByText("Quadruped Soccer")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Log out" }));
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByText("Quadruped Soccer")).not.toBeInTheDocument();
+    expect(state.calls.some((c) => c.method === "POST" && c.path === "/auth/logout")).toBe(true);
+    expect(state.authenticated).toBe(false);
+    // and a different user can sign in again without a reload
+    await user.type(screen.getByLabelText("Password"), "correct-horse-1");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Quadruped Soccer")).toBeInTheDocument();
+  });
+});
+
 describe("i18n", () => {
   it("switches the UI to Simplified Chinese and remembers it", async () => {
     state = installFakeApi({

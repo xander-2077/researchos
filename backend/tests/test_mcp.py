@@ -186,3 +186,33 @@ async def test_modern_protocol_mode(live_server: LiveServer):
         res = payload(await c.call_tool("list_projects", {}))
         assert res["total"] == 2
         assert "insufficient_scope" in error_text(await c.call_tool("log_progress", {"project": "quadruped-soccer", "summary": "x"}))
+
+
+async def test_deadline_query_filters_before_truncating(live_server: LiveServer):
+    """Regression: priority was applied *after* `limit`, hiding a critical task behind an earlier low one."""
+    c, h = live_server.client, live_server.csrf
+    p = c.post("/api/v1/projects", json={"title": "Deadlines"}, headers=h).json()
+    d = lambda n: (date.today() + timedelta(days=n)).isoformat()  # noqa: E731
+    for title, prio, due in [("low tomorrow", "low", d(1)), ("critical day after", "critical", d(2)), ("high later", "high", d(3))]:
+        c.post("/api/v1/tasks", json={"project_id": p["id"], "title": title, "priority": prio, "due_date": due}, headers=h)
+    async with mcp_client(live_server.url, live_server.ro_token) as cl:
+        res = payload(await cl.call_tool("query_work", {"resource_type": "deadline", "priority": "critical", "limit": 1}))
+        assert res["total"] == 1 and [i["title"] for i in res["items"]] == ["critical day after"]
+        res = payload(await cl.call_tool("query_work", {"resource_type": "deadline", "priority": "critical,high", "limit": 1}))
+        assert res["total"] == 2 and len(res["items"]) == 1  # total counts matches, items respects limit
+        res = payload(await cl.call_tool("query_work", {"resource_type": "deadline", "keyword": "later", "limit": 1}))
+        assert res["total"] == 1 and res["items"][0]["title"] == "high later"
+        res = payload(await cl.call_tool("query_work", {"resource_type": "deadline", "limit": 2}))
+        assert res["total"] == 3 and len(res["items"]) == 2
+
+
+async def test_get_project_with_mixed_unit_metrics(live_server: LiveServer):
+    c, h = live_server.client, live_server.csrf
+    p = c.post("/api/v1/projects", json={"title": "Units"}, headers=h).json()
+    e = c.post("/api/v1/experiments", json={"project_id": p["id"], "name": "Latency"}, headers=h).json()
+    for i, (v, u) in enumerate([(1, "s"), (1000, "ms")]):
+        c.post(f"/api/v1/experiments/{e['id']}/runs", json={"external_run_id": f"r{i}", "metrics": {"latency": {"value": v, "unit": u}}}, headers=h)
+    async with mcp_client(live_server.url, live_server.ro_token) as cl:
+        res = payload(await cl.call_tool("get_project", {"project": "units", "include": ["experiments"]}))
+    m = res["recent_experiments"][0]["metrics"]["latency"]
+    assert m == {"mixed_units": ["ms", "s"], "n": 2}  # no misleading mean

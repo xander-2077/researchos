@@ -216,7 +216,7 @@ def test_experiment_crud_and_runs_idempotent(ctx: Ctx):
     assert set(r2["metrics_json"]) == {"success_rate", "return"}  # merged
     assert r1["verification_status"] == "needs_review"
     ctx.client.post(f"/api/v1/experiments/{e['id']}/runs", json={**run, "external_run_id": "wandb-def", "seed": 2,
-                                                                  "metrics": {"success_rate": 0.7}}, headers=ctx.rw)
+                                                                  "metrics": {"success_rate": {"value": 0.7, "unit": "%"}}}, headers=ctx.rw)  # same unit → aggregable
     detail = ctx.client.get(f"/api/v1/experiments/{e['id']}", headers=ctx.ro).json()
     assert detail["run_count"] == 2 and len(detail["runs"]) == 2
     sr = detail["metric_summary"]["success_rate"]

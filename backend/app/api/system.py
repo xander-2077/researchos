@@ -32,6 +32,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = auth_svc.authenticate(db, data.username, data.password)
     request.session.clear()
     request.session["uid"] = user.id
+    request.session["sv"] = user.session_version
     request.session["csrf"] = secrets.token_urlsafe(32)
     return {"username": user.username, "csrf_token": request.session["csrf"]}
 
@@ -48,6 +49,9 @@ def me(request: Request, db: Session = Depends(get_db)):
     ``setup_required`` tells the UI that no admin exists yet."""
     uid = request.session.get("uid")
     user = db.get(User, uid) if uid else None
+    if user is not None and request.session.get("sv") != user.session_version:
+        request.session.clear()
+        user = None
     if user is None:
         return {"authenticated": False, "setup_required": auth_svc.user_count(db) == 0}
     if "csrf" not in request.session:
@@ -59,8 +63,11 @@ def me(request: Request, db: Session = Depends(get_db)):
 def change_password(data: PasswordChange, request: Request, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
     if actor.kind != "user":
         raise Forbidden("Password can only be changed from a browser session")
-    auth_svc.change_password(db, request.session["uid"], data.current_password, data.new_password)
-    return {"ok": True}
+    user = auth_svc.change_password(db, request.session["uid"], data.current_password, data.new_password)
+    # Every other session is now invalid; keep this one (rotate the CSRF token too).
+    request.session["sv"] = user.session_version
+    request.session["csrf"] = secrets.token_urlsafe(32)
+    return {"ok": True, "csrf_token": request.session["csrf"]}
 
 
 # ---------------------------------------------------------------- tokens

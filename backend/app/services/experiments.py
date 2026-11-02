@@ -27,8 +27,10 @@ from app.schemas.entities import ExperimentCreate, ExperimentUpdate, RunCreate, 
 from app.services.activity import log_event
 
 SORTABLE = {"name", "status", "group_name", "type", "created_at", "updated_at"}
-PROTECTED_EXP_FIELDS = {"status", "conclusion", "hypothesis", "baseline", "variant"}
-PROTECTED_RUN_FIELDS = {"metrics_json", "conclusion", "config_json", "verification_status", "status", "git_commit"}
+# Once an experiment/run is verified, *any* change by an agent is a change to verified evidence
+# (seed, commit, config, metrics, artifacts, environment, timestamps, conclusion, even the name or
+# group it was verified under). A field allow-list is too easy to get wrong, so everything is
+# protected: see _apply_experiment_changes / _apply_run_changes.
 
 
 def _unit(u: str | None) -> str:
@@ -52,22 +54,32 @@ def _forbid_agent_verify(actor: Actor, field: str, value: str | None) -> None:
 
 # ------------------------------------------------------------------ read
 def metric_summary(runs: list[ExperimentRun]) -> dict[str, dict[str, Any]]:
-    """Per-metric mean/std/n across runs (only numeric values)."""
-    acc: dict[str, list[float]] = {}
-    units: dict[str, str] = {}
+    """Per-metric mean/std/n across runs (numeric values only).
+
+    Values are only aggregated when every run reports the metric in the *same unit*. If units
+    differ (``1 s`` vs ``1000 ms``) an average would be meaningless, so ``mixed_units`` is set,
+    ``units`` lists them and mean/std/min/max are ``None`` — convert to one unit before comparing.
+    """
+    acc: dict[str, list[tuple[float, str]]] = {}
     for r in runs:
         for k, m in (r.metrics_json or {}).items():
             v = m.get("value") if isinstance(m, dict) else m
             if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
-                acc.setdefault(k, []).append(float(v))
-                if isinstance(m, dict) and m.get("unit"):
-                    units[k] = m["unit"]
-    out = {}
-    for k, vals in acc.items():
-        n = len(vals)
+                unit = (m.get("unit") or "").strip() if isinstance(m, dict) else ""
+                acc.setdefault(k, []).append((float(v), unit))
+    out: dict[str, dict[str, Any]] = {}
+    for k, pairs in acc.items():
+        units = sorted({u for _, u in pairs})
+        n = len(pairs)
+        if len(units) > 1:
+            out[k] = {"mean": None, "std": None, "n": n, "min": None, "max": None, "unit": "",
+                      "units": units, "mixed_units": True}
+            continue
+        vals = [v for v, _ in pairs]
         mean = sum(vals) / n
         std = math.sqrt(sum((x - mean) ** 2 for x in vals) / (n - 1)) if n > 1 else 0.0
-        out[k] = {"mean": mean, "std": std, "n": n, "min": min(vals), "max": max(vals), "unit": units.get(k, "")}
+        out[k] = {"mean": mean, "std": std, "n": n, "min": min(vals), "max": max(vals), "unit": units[0],
+                  "units": units, "mixed_units": False}
     return out
 
 
@@ -162,11 +174,11 @@ def _apply_experiment_changes(db: Session, actor: Actor, e: Experiment, changes:
     if not changes:
         return
     _forbid_agent_verify(actor, "status", changes.get("status"))
-    if e.status == "verified" and not actor.is_human and set(changes) & PROTECTED_EXP_FIELDS:
+    if e.status == "verified" and not actor.is_human:
         if not confirm:
             raise Conflict(
                 f"Experiment '{e.name}' is verified; refusing to change "
-                f"{sorted(set(changes) & PROTECTED_EXP_FIELDS)} without confirm_overwrite_verified=true. "
+                f"{sorted(changes)} without confirm_overwrite_verified=true. "
                 "Ask the user first.",
                 code="verified_protected",
             )
@@ -252,11 +264,11 @@ def _apply_run_changes(db: Session, actor: Actor, run: ExperimentRun, fields: di
     if not changes:
         return []
     _forbid_agent_verify(actor, "verification_status", changes.get("verification_status"))
-    if run.verification_status == "verified" and not actor.is_human and set(changes) & PROTECTED_RUN_FIELDS:
+    if run.verification_status == "verified" and not actor.is_human:
         if not confirm:
             raise Conflict(
                 f"Run '{run.external_run_id}' is verified; refusing to change "
-                f"{sorted(set(changes) & PROTECTED_RUN_FIELDS)} without confirm_overwrite_verified=true.",
+                f"{sorted(changes)} without confirm_overwrite_verified=true.",
                 code="verified_protected",
             )
         changes["verification_status"] = "needs_review"

@@ -4,6 +4,7 @@ Commands:
   migrate                      Upgrade the database schema to the latest version
   db-version                   Show the current schema revision
   set-password [--username U]  Create the admin user or reset its password (prompts)
+  rename-user OLD NEW          Change the admin login name (.env only applies on the very first start)
   create-token NAME [--write] [--days N]   Print a new API token (shown once)
   list-tokens / revoke-token ID
   backup [PATH]                Consistent online backup via the SQLite backup API
@@ -17,6 +18,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import os
 import shutil
 import sqlite3
 import sys
@@ -63,6 +65,15 @@ def cmd_set_password(a: argparse.Namespace) -> None:
     with SessionLocal() as db:
         set_password(db, a.username, pw)
     print(f"Password set for '{a.username}'.")
+
+
+def cmd_rename_user(a: argparse.Namespace) -> None:
+    from app.services.auth import rename_user
+
+    _setup()
+    with SessionLocal() as db:
+        u = rename_user(db, a.old, a.new)
+    print(f"Renamed '{a.old}' → '{u.username}'. Existing sessions were signed out; the password is unchanged.")
 
 
 def cmd_create_token(a: argparse.Namespace) -> None:
@@ -128,29 +139,94 @@ def cmd_backup(a: argparse.Namespace) -> None:
     print(backup_to(dest))
 
 
+REQUIRED_TABLES = {
+    "alembic_version", "projects", "milestones", "tasks", "experiments", "experiment_runs",
+    "progress_events", "api_tokens", "users",
+}
+
+
+class BackupInvalid(Exception):
+    pass
+
+
+def validate_backup(path: Path) -> str:
+    """Refuse anything that is not a healthy ResearchOS database this code version can open.
+    Returns the schema revision. Raises BackupInvalid with a human-readable reason."""
+    from alembic.script import ScriptDirectory
+
+    from app.database.migrate import alembic_config
+
+    try:
+        conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro&immutable=1", uri=True)
+    except sqlite3.Error as e:  # pragma: no cover - defensive
+        raise BackupInvalid(f"cannot open as SQLite: {e}") from e
+    try:
+        try:
+            if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                raise BackupInvalid("failed SQLite integrity check")
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        except sqlite3.DatabaseError as e:
+            raise BackupInvalid(f"not a valid SQLite database ({e})") from e
+        missing = REQUIRED_TABLES - tables
+        if missing:
+            raise BackupInvalid(f"not a ResearchOS database: missing table(s) {sorted(missing)}")
+        row = conn.execute("SELECT version_num FROM alembic_version").fetchone()
+        if not row:
+            raise BackupInvalid("alembic_version is empty; schema version unknown")
+        revision = row[0]
+    finally:
+        conn.close()
+    script = ScriptDirectory.from_config(alembic_config(get_settings().sqlalchemy_url))
+    try:
+        known = script.get_revision(revision)
+    except Exception:  # noqa: BLE001 - alembic raises CommandError/ResolutionError for unknown ids
+        known = None
+    if known is None:
+        raise BackupInvalid(
+            f"schema revision '{revision}' is unknown to this version (backup from a newer release?). "
+            "Upgrade ResearchOS first."
+        )
+    return revision
+
+
 def cmd_restore(a: argparse.Namespace) -> None:
     src = Path(a.path)
     if not src.exists():
         sys.exit(f"Backup not found: {src}")
-    conn = sqlite3.connect(f"file:{src.resolve()}?mode=ro&immutable=1", uri=True)
     try:
-        if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-            sys.exit("Backup failed integrity check; refusing to restore")
-    finally:
-        conn.close()
+        revision = validate_backup(src)
+    except BackupInvalid as e:
+        sys.exit(f"Refusing to restore {src}: {e}. The current database was not touched.")
     target = _db_path()
+    print(f"Backup looks valid (schema revision {revision}).")
     if not a.yes:
         ans = input(f"Restore {src} over {target}? Stop the server first. [y/N] ")
         if ans.lower() != "y":
             sys.exit("Aborted")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    safety = None
     if target.exists():
         safety = target.with_name(target.name + f".pre-restore-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}")
         backup_to(safety)
         print(f"Saved current database to {safety}")
-    for suffix in ("-wal", "-shm"):
-        Path(str(target) + suffix).unlink(missing_ok=True)
-    shutil.copyfile(src, target)
-    upgrade_to_head(get_settings().sqlalchemy_url)
+    # Stage next to the target and validate the staged copy, so a failure never leaves a half-written DB.
+    staged = target.with_name(target.name + ".restore-tmp")
+    staged.unlink(missing_ok=True)
+    shutil.copyfile(src, staged)
+    try:
+        validate_backup(staged)
+        for suffix in ("-wal", "-shm"):
+            Path(str(target) + suffix).unlink(missing_ok=True)
+        os.replace(staged, target)
+        upgrade_to_head(get_settings().sqlalchemy_url)
+    except Exception as e:  # noqa: BLE001 - roll back on any failure
+        staged.unlink(missing_ok=True)
+        if safety is not None:
+            for suffix in ("-wal", "-shm"):
+                Path(str(target) + suffix).unlink(missing_ok=True)
+            os.replace(safety, target)
+            sys.exit(f"Restore failed ({e}); the previous database has been put back.")
+        sys.exit(f"Restore failed: {e}")
     print(f"Restored {src} → {target}")
 
 
@@ -185,6 +261,10 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--username", default=get_settings().admin_username)
     sp.add_argument("--password", help="non-interactive (avoid: ends up in shell history)")
     sp.set_defaults(fn=cmd_set_password)
+    sp = sub.add_parser("rename-user", help="change the admin login name (RESEARCHOS_ADMIN_USERNAME only applies on first start)")
+    sp.add_argument("old")
+    sp.add_argument("new")
+    sp.set_defaults(fn=cmd_rename_user)
     sp = sub.add_parser("create-token")
     sp.add_argument("name")
     sp.add_argument("--write", action="store_true", help="read/write (default read-only)")

@@ -40,7 +40,28 @@ def set_password(db: Session, username: str, password: str) -> User:
         db.add(user)
     else:
         user.password_hash = _ph.hash(password)
+        user.session_version = (user.session_version or 1) + 1  # invalidates all existing sessions
     db.commit()
+    db.refresh(user)
+    return user
+
+
+def rename_user(db: Session, old: str, new: str) -> User:
+    """Change the login name. All existing sessions are invalidated."""
+    new = new.strip()
+    if not (1 <= len(new) <= 64):
+        raise ValidationFailed("Username must be 1-64 characters")
+    user = db.scalar(select(User).where(User.username == old))
+    if user is None:
+        raise NotFound(f"User '{old}' not found")
+    if user.username == new:
+        return user
+    if db.scalar(select(User.id).where(User.username == new)) is not None:
+        raise ValidationFailed(f"Username '{new}' is already taken")
+    user.username = new
+    user.session_version = (user.session_version or 1) + 1
+    db.commit()
+    db.refresh(user)
     return user
 
 
@@ -59,7 +80,7 @@ def authenticate(db: Session, username: str, password: str) -> User:
     return user
 
 
-def change_password(db: Session, user_id: int, current: str, new: str) -> None:
+def change_password(db: Session, user_id: int, current: str, new: str) -> User:
     user = db.get(User, user_id)
     if user is None:
         raise NotFound("User not found")
@@ -67,7 +88,7 @@ def change_password(db: Session, user_id: int, current: str, new: str) -> None:
         _ph.verify(user.password_hash, current)
     except (VerifyMismatchError, InvalidHashError):
         raise Unauthorized("Current password is incorrect") from None
-    set_password(db, user.username, new)
+    return set_password(db, user.username, new)
 
 
 # ------------------------------------------------------------------ tokens

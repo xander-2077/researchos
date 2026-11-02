@@ -63,6 +63,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Bumped whenever the password changes; sessions carry the value they were issued with, so every
+    # older session (e.g. a stolen cookie) stops working immediately.
+    session_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
 
 class Project(TimestampMixin, Base):

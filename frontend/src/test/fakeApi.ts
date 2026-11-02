@@ -46,6 +46,10 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     let m: RegExpMatchArray | null;
 
     if (path === "/auth/me") return json(state.authenticated ? { authenticated: true, username: "admin", csrf_token: "csrf-1" } : { authenticated: false, setup_required: false });
+    if (path === "/auth/logout" && method === "POST") {
+      state.authenticated = false;
+      return json({ ok: true });
+    }
     if (path === "/auth/login" && method === "POST") {
       if (body?.password !== "correct-horse-1") return json({ error: { code: "unauthorized", message: "Invalid username or password" } }, 401);
       state.authenticated = true;

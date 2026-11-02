@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FlaskConical, Plus, Search } from "lucide-react";
+import { AlertTriangle, FlaskConical, Plus, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
@@ -9,11 +9,18 @@ import { DataTable } from "@/features/common";
 import { useAppState } from "@/hooks/app-state";
 import { useExperiments } from "@/hooks/queries";
 import { formatNumber, label, relativeTime } from "@/lib/utils";
-import { EXPERIMENT_STATUSES, EXPERIMENT_TYPES, type Experiment } from "@/types/api";
+import { EXPERIMENT_STATUSES, EXPERIMENT_TYPES, type Experiment, type MetricSummary } from "@/types/api";
 import { t } from "@/i18n";
 
-export function MetricStat({ m }: { m: { mean: number; std: number; n: number; unit: string } | undefined }) {
+export function MetricStat({ m }: { m: MetricSummary | undefined }) {
   if (!m) return <span className="text-muted-foreground">—</span>;
+  if (m.mixed_units || m.mean === null || m.std === null) {
+    return (
+      <span className="inline-flex items-center gap-1 whitespace-nowrap text-[12px] text-warning" title={t("Runs report this metric in different units ({units}); convert to one unit to compare.", { units: m.units.map((u) => u || "–").join(", ") })}>
+        <AlertTriangle className="size-3.5" />{t("Mixed units")}
+      </span>
+    );
+  }
   return (
     <span className="whitespace-nowrap tabular-nums" title={`n=${m.n}`}>
       {formatNumber(m.mean)}

@@ -57,6 +57,8 @@ class ProjectCreate(ProjectBase):
     def _slug(cls, v: str | None) -> str | None:
         if v is not None and not SLUG_RE.match(v):
             raise ValueError("slug must be lowercase letters, digits and dashes")
+        if v is not None and v.isdigit():
+            raise ValueError("slug cannot consist only of digits (it would clash with project ids)")
         return v
 
 
@@ -89,6 +91,8 @@ class ProjectUpdate(Strict):
     def _slug(cls, v: str | None) -> str | None:
         if v is not None and not SLUG_RE.match(v):
             raise ValueError("slug must be lowercase letters, digits and dashes")
+        if v is not None and v.isdigit():
+            raise ValueError("slug cannot consist only of digits (it would clash with project ids)")
         return v
 
 

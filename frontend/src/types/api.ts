@@ -123,12 +123,15 @@ export interface MetricValue {
 }
 
 export interface MetricSummary {
-  mean: number;
-  std: number;
+  /** null when runs report this metric in different units (mixed_units) */
+  mean: number | null;
+  std: number | null;
   n: number;
-  min: number;
-  max: number;
+  min: number | null;
+  max: number | null;
   unit: string;
+  units: string[];
+  mixed_units: boolean;
 }
 
 export interface Run {

@@ -108,7 +108,12 @@ export const api = {
   me: () => get<Me>("/auth/me"),
   login: (username: string, password: string) => post<{ username: string; csrf_token: string }>("/auth/login", { username, password }),
   logout: () => post<{ ok: boolean }>("/auth/logout"),
-  changePassword: (current_password: string, new_password: string) => post("/auth/password", { current_password, new_password }),
+  // The server rotates the CSRF token (and invalidates all other sessions) on password change.
+  changePassword: (current_password: string, new_password: string) =>
+    post<{ ok: boolean; csrf_token: string }>("/auth/password", { current_password, new_password }).then((r) => {
+      setCsrfToken(r.csrf_token);
+      return r;
+    }),
 
   projects: (q?: Query) => get<Page<Project>>("/projects", q),
   project: (ref: string | number) => get<Project>(`/projects/${ref}`),

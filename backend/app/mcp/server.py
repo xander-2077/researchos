@@ -203,8 +203,10 @@ async def get_project(
             out["recent_experiments"] = [
                 {"experiment_id": e.id, "experiment_key": e.experiment_key, "name": e.name, "group": e.group_name,
                  "status": e.status, "runs": len(e.runs), "conclusion": e.conclusion,
-                 "metrics": {k: {"mean": round(v["mean"], 6), "std": round(v["std"], 6), "n": v["n"]}
-                             for k, v in exp_svc.metric_summary(list(e.runs)).items()}}
+                 "metrics": {
+                     k: ({"mixed_units": v["units"], "n": v["n"]} if v["mixed_units"]
+                         else {"mean": round(v["mean"], 6), "std": round(v["std"], 6), "n": v["n"], "unit": v["unit"]})
+                     for k, v in exp_svc.metric_summary(list(e.runs)).items()}}
                 for e in rows]
         if "progress" in include:
             rows, *_ = act_svc.list_events(db, actor, project_id=p.id, limit=limit)
