@@ -1,6 +1,0 @@
-[Unit]
-Description=Renew ResearchOS HTTPS certificate
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/certbot renew --cert-name research.example.com --quiet --deploy-hook "/usr/sbin/nginx -t && /bin/systemctl reload nginx"
