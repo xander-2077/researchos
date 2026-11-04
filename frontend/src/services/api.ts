@@ -71,12 +71,12 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
 export interface UploadedImage { url: string; name: string; size: number; content_type: string }
 
 /** Upload an image (raw body) for use in Markdown fields. */
-async function uploadImage(file: Blob): Promise<UploadedImage> {
+async function uploadImage(file: Blob, signal?: AbortSignal): Promise<UploadedImage> {
   const headers: Record<string, string> = { Accept: "application/json", "Content-Type": file.type || "application/octet-stream" };
   if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
   let res: Response;
   try {
-    res = await fetch("/api/v1/uploads", { method: "POST", headers, credentials: "same-origin", body: file });
+    res = await fetch("/api/v1/uploads", { method: "POST", headers, credentials: "same-origin", body: file, signal });
   } catch {
     throw new ApiError(0, "network_error", "Cannot reach the ResearchOS server");
   }
@@ -96,6 +96,21 @@ const post = <T>(p: string, b?: unknown) => request<T>("POST", p, b ?? {});
 const patch = <T>(p: string, b: unknown) => request<T>("PATCH", p, b);
 const del = <T>(p: string) => request<T>("DELETE", p);
 
+/** Fetch complete collections in bounded pages for tables, boards and selectors. */
+async function allPages<T>(fetchPage: (q: Query) => Promise<Page<T>>, q: Query = {}, signal?: AbortSignal): Promise<Page<T>> {
+  const items: T[] = [];
+  let offset = 0;
+  while (true) {
+    signal?.throwIfAborted();
+    const page = await fetchPage({ ...q, limit: 100, offset });
+    signal?.throwIfAborted();
+    items.push(...page.items);
+    offset += page.items.length;
+    if (offset >= page.total) return { items, total: page.total, offset: 0, limit: items.length };
+    if (!page.items.length) throw new ApiError(0, "incomplete_page", "The list changed while loading. Please retry.");
+  }
+}
+
 export type ProjectInput = Partial<
   Pick<Project, "title" | "slug" | "description" | "research_question" | "hypothesis" | "target_venue"
     | "submission_deadline" | "stage" | "health_status" | "priority" | "repository_url" | "next_action"
@@ -112,6 +127,7 @@ export type ExperimentInput = Partial<
     | "variant" | "description" | "status" | "conclusion">
 >;
 export interface RunInput {
+  metrics_mode?: "merge" | "replace";
   external_run_id?: string;
   seed?: number | null;
   git_commit?: string;
@@ -139,6 +155,7 @@ export const api = {
       return r;
     }),
 
+  allProjects: (q?: Query, signal?: AbortSignal) => allPages((page) => get<Page<Project>>("/projects", page), q, signal),
   projects: (q?: Query) => get<Page<Project>>("/projects", q),
   project: (ref: string | number) => get<Project>(`/projects/${ref}`),
   createProject: (b: ProjectInput) => post<Project>("/projects", b),
@@ -151,11 +168,13 @@ export const api = {
   updateMilestone: (id: number, b: MilestoneInput) => patch<Milestone>(`/milestones/${id}`, b),
   deleteMilestone: (id: number) => del<void>(`/milestones/${id}`),
 
+  allTasks: (q?: Query, signal?: AbortSignal) => allPages((page) => get<Page<Task>>("/tasks", page), q, signal),
   tasks: (q?: Query) => get<Page<Task>>("/tasks", q),
   createTask: (b: TaskInput) => post<Task>("/tasks", b),
   updateTask: (id: number, b: TaskInput) => patch<Task>(`/tasks/${id}`, b),
   deleteTask: (id: number) => del<void>(`/tasks/${id}`),
 
+  allExperiments: (q?: Query, signal?: AbortSignal) => allPages((page) => get<Page<Experiment>>("/experiments", page), q, signal),
   experiments: (q?: Query) => get<Page<Experiment>>("/experiments", q),
   experiment: (id: number) => get<Experiment>(`/experiments/${id}`),
   createExperiment: (b: ExperimentInput) => post<Experiment>("/experiments", b),

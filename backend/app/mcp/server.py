@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Any, Literal, TypeVar
 
 import anyio.to_thread
@@ -111,6 +111,24 @@ async def _run(ctx: Context | None, fn: Callable[[Session, Actor], T]) -> T:
 
 def _iso(v: Any) -> Any:
     return v.isoformat() if hasattr(v, "isoformat") else v
+
+
+def _provided_fields(ctx: Context | None, values: dict[str, Any], *, nullable: tuple[str, ...] = ()) -> dict[str, Any]:
+    """Keep explicit null distinct from omitted optional MCP arguments.
+
+    MCP SDK 2.x currently exposes the original call parameters only through
+    Context._input_params. Keep that dependency here, covered by protocol tests.
+    Calls outside the protocol retain the previous non-None argument behavior.
+    """
+    params = getattr(ctx, "_input_params", None)
+    arguments = getattr(params, "arguments", None)
+    fields = {k: v for k, v in values.items() if k in arguments} if arguments is not None else {
+        k: v for k, v in values.items() if v is not None
+    }
+    for key, value in fields.items():
+        if value is None and key not in nullable:
+            raise ToolError(f"[validation_error] {key} cannot be null; omit it to preserve its value")
+    return fields
 
 
 def _project_brief(s: dict[str, Any]) -> dict[str, Any]:
@@ -282,15 +300,19 @@ async def upsert_task(
     git_reference: Annotated[str | None, Field(description="Commit SHA, branch or PR URL")] = None,
 ) -> dict[str, Any]:
     """Create or update a task. Update by task_id, or by client_key; otherwise create.
-    project is optional when updating by task_id. Otherwise omitting it means
-    a task without a project (client_key is then matched among those tasks).
-    Only fields you pass are changed."""
+    By task_id, omitting project preserves it; explicit null removes the project.
+    Otherwise omitting project means a task without a project (client_key is then
+    matched among those tasks). Only fields you pass are changed; null clears dates
+    and milestone_id."""
 
-    fields = {k: v for k, v in {
+    fields = _provided_fields(ctx, {
         "title": title, "description": description, "status": status, "priority": priority,
         "due_date": due_date, "start_date": start_date, "depends_on": depends_on,
         "milestone_id": milestone_id, "tags": tags, "git_reference": git_reference,
-    }.items() if v is not None}
+    }, nullable=("due_date", "start_date", "milestone_id"))
+    project_fields = _provided_fields(ctx, {"project": project}, nullable=("project",))
+    if task_id is not None and "project" in project_fields and project is None:
+        fields["project_id"] = None
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
         p = proj_svc.resolve_project(db, project) if project is not None else None
@@ -317,10 +339,10 @@ async def upsert_milestone(
     due_date: Annotated[date | None, Field(description="YYYY-MM-DD")] = None,
 ) -> dict[str, Any]:
     """Create or update a milestone (a checkpoint with a clear completion criterion).
-    Only fields you pass are changed."""
+    Only fields you pass are changed; null clears due_date."""
 
-    fields = {k: v for k, v in {"title": title, "description": description, "status": status,
-                                "due_date": due_date}.items() if v is not None}
+    fields = _provided_fields(ctx, {"title": title, "description": description, "status": status,
+                                   "due_date": due_date}, nullable=("due_date",))
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
         p = proj_svc.resolve_project(db, project)
@@ -369,13 +391,19 @@ async def record_experiment(
     artifact_links: Annotated[list[str] | None, Field(description="URLs/paths to logs, videos, checkpoints (not uploads)")] = None,
     run_status: Literal["planned", "running", "completed", "failed", "cancelled"] | None = None,
     run_conclusion: Annotated[str | None, Field(description="Notes on this specific run")] = None,
+    started_at: Annotated[datetime | None, Field(description="Run start timestamp; null clears")] = None,
+    finished_at: Annotated[datetime | None, Field(description="Run finish timestamp; null clears")] = None,
     confirm_overwrite_verified: Annotated[bool, Field(description="Only after the user explicitly approves changing verified results")] = False,
 ) -> dict[str, Any]:
     """Create/update an experiment (by experiment_key) and optionally one run (by external_run_id)
     atomically. Idempotent: repeating the same call does not create duplicates. New results are
-    marked needs_review; agents cannot mark anything verified."""
+    marked needs_review; agents cannot mark anything verified. Metrics merge incrementally.
+    Omitted fields stay unchanged; null clears seed, started_at or finished_at."""
 
-    params = {k: v for k, v in locals().items() if k not in ("ctx", "project")}
+    params = _provided_fields(
+        ctx, {k: v for k, v in locals().items() if k not in ("ctx", "project")},
+        nullable=("seed", "started_at", "finished_at"),
+    )
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
         p = proj_svc.resolve_project(db, project)
@@ -442,13 +470,15 @@ async def update_project(
     ] = False,
 ) -> dict[str, Any]:
     """Update a project's stage, health, priority, next action, blockers, venue or deadline.
-    Only fields you pass are changed."""
+    Only fields you pass are changed; null clears submission_deadline."""
 
-    changes = {k: v for k, v in {
-        "stage": research_stage, "health_status": health_status, "priority": priority,
+    changes = _provided_fields(ctx, {
+        "research_stage": research_stage, "health_status": health_status, "priority": priority,
         "next_action": next_action, "blocker_summary": blocker_summary, "target_venue": target_venue,
         "submission_deadline": submission_deadline,
-    }.items() if v is not None}
+    }, nullable=("submission_deadline",))
+    if "research_stage" in changes:
+        changes["stage"] = changes.pop("research_stage")
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
         p = proj_svc.resolve_project(db, project)

@@ -25,6 +25,8 @@ class Link(BaseModel):
 
 
 class MetricValue(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     value: float | int | None = None
     unit: str = ""
     description: str = ""
@@ -42,7 +44,7 @@ def normalize_metrics(raw: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
         if isinstance(val, dict):
             out[key] = MetricValue.model_validate(val).model_dump()
         elif isinstance(val, (int, float)) and not isinstance(val, bool):
-            out[key] = {"value": val, "unit": "", "description": ""}
+            out[key] = MetricValue(value=val).model_dump()
         else:
             raise ValueError(f"metric '{key}' must be a number or an object with 'value'")
     return out

@@ -87,6 +87,19 @@ export function parseDate(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
+/** Inclusive timestamp bounds for a browser-local calendar day. */
+export function localDayStartISO(day: string): string | undefined {
+  return day ? parseDate(day).toISOString() : undefined;
+}
+
+export function localDayEndISO(day: string): string | undefined {
+  if (!day) return undefined;
+  const next = parseDate(day);
+  next.setDate(next.getDate() + 1); // Calendar addition respects 23/25-hour DST days.
+  // Backend timestamp filters are inclusive and store microseconds.
+  return new Date(next.getTime() - 1).toISOString().replace(".999Z", ".999999Z");
+}
+
 export function daysUntil(s: string | null | undefined): number | null {
   if (!s) return null;
   const t = parseDate(todayISO()).getTime();

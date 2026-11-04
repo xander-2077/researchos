@@ -60,6 +60,7 @@ def deadlines_between(
     end: date | None,
     *,
     include_overdue: bool = True,
+    include_archived: bool = False,
     project_id: int | None = None,
     kinds: tuple[str, ...] = DEADLINE_KINDS,
     limit: int | None = 100,
@@ -82,7 +83,7 @@ def deadlines_between(
         return conds
 
     items: list[dict[str, Any]] = []
-    proj_filter = [Project.archived.is_(False)]
+    proj_filter = [] if include_archived else [Project.archived.is_(False)]
     if project_id is not None:
         proj_filter.append(Project.id == project_id)
 
@@ -107,7 +108,7 @@ def deadlines_between(
         ):
             items.append(item("milestone", m.id, m.title, m.due_date, m.project, status=m.status))
     if "task" in kinds:
-        task_filter = [Task.project_id.is_(None) | Project.archived.is_(False)]
+        task_filter = [] if include_archived else [Task.project_id.is_(None) | Project.archived.is_(False)]
         if project_id is not None:
             task_filter.append(by_project(Task.project_id, project_id))
         for t in db.scalars(

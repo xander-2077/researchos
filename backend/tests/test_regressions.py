@@ -178,20 +178,21 @@ def test_restore_refuses_non_sqlite_and_newer_schema(restore_env, tmp_path):
     assert _titles(db_path) == ["Keep"]
 
 
-def test_restore_rolls_back_if_migration_fails(restore_env, tmp_path, monkeypatch):
+def test_restore_preserves_database_if_staged_migration_fails(restore_env, tmp_path, monkeypatch):
     db_path = _make_db(restore_env, ["Current"])
     good = tmp_path / "good.db"
-    other = restore_env.model_copy(update={"data_dir": tmp_path / "other"})
     cli.backup_to(good)  # same content; we only need a valid file
     with sqlite3.connect(good) as c:
         c.execute("UPDATE projects SET title = 'FromBackup'")
+    before = db_path.read_bytes()
     monkeypatch.setattr(cli, "upgrade_to_head", lambda url: (_ for _ in ()).throw(RuntimeError("boom")))
     with pytest.raises(SystemExit) as exc:
         cli.main(["restore", str(good), "--yes"])
-    assert "previous database has been put back" in str(exc.value)
+    assert "current database was not replaced" in str(exc.value)
+    assert db_path.read_bytes() == before
     assert _titles(db_path) == ["Current"]
-    assert not db_path.with_name(db_path.name + ".restore-tmp").exists()
-    del other
+    assert not list(db_path.parent.glob(".restore-*"))
+    assert not list(db_path.parent.glob("*.pre-restore-*"))
 
 
 def test_restore_accepts_valid_backup(restore_env, tmp_path):

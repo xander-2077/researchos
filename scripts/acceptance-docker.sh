@@ -5,11 +5,21 @@
 # Requires: built image (docker compose build), backend/.venv with requirements-dev.txt + `playwright install chromium`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Resolve the image from the caller's configuration before replacing it with test settings.
+SOURCE_COMPOSE=(docker compose)
+if [[ -n "${RESEARCHOS_ENV_FILE:-}" ]]; then SOURCE_COMPOSE+=(--env-file "$RESEARCHOS_ENV_FILE"); fi
+RESEARCHOS_IMAGE="$("${SOURCE_COMPOSE[@]}" config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["researchos"]["image"])')"
+export RESEARCHOS_IMAGE
+echo "Acceptance image: $RESEARCHOS_IMAGE"
 export COMPOSE_PROJECT_NAME=researchos-acceptance
 export RESEARCHOS_VOLUME=researchos-acceptance-data
 export RESEARCHOS_PORT="${RESEARCHOS_PORT:-8100}"
 PW="acceptance-$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-ENVF="$(mktemp)"; printf 'RESEARCHOS_ADMIN_PASSWORD=%s\n' "$PW" > "$ENVF"
+ENVF="$(mktemp)"
+printf 'RESEARCHOS_ADMIN_USERNAME=admin\nRESEARCHOS_ADMIN_PASSWORD=%s\nRESEARCHOS_COOKIE_SECURE=false\n' "$PW" > "$ENVF"
+# Use the isolated file for container settings too, never inherit the real deployment's .env.
+export RESEARCHOS_ENV_FILE="$ENVF"
+export COMPOSE_PROFILES=""
 BASE="http://127.0.0.1:$RESEARCHOS_PORT"
 STATE="$(mktemp)"
 cleanup() { docker compose --env-file "$ENVF" down -v >/dev/null 2>&1 || true; rm -f "$ENVF" "$STATE"; }

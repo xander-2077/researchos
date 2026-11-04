@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Dialog } from "@/components/ui/overlay";
-import { useMilestones, useProjects, useTasks, useWrite } from "@/hooks/queries";
+import { useMilestones, useAllProjects, useAllTasks, useWrite } from "@/hooks/queries";
 import { IconPicker } from "@/components/icons/project-icons";
 import { MarkdownInput } from "./markdown-input";
 import { api, type RunInput } from "@/services/api";
@@ -42,9 +42,9 @@ const optionalUrl = z.string().trim().max(500).refine((v) => !v || /^(https?:\/\
 const optDate = z.string().optional().transform((v) => (v ? v : null));
 const nonEmpty = (name: string, max = 300) => z.string().trim().min(1, `${name} is required`).max(max, `Max ${max} characters`);
 
-function FormDialog({ open, onOpenChange, title, description, onSubmit, busy, submitLabel, children, wide }: {
+function FormDialog({ open, onOpenChange, title, description, onSubmit, busy, uploading = false, submitLabel, children, wide }: {
   open: boolean; onOpenChange: (o: boolean) => void; title: string; description?: string;
-  onSubmit: () => void; busy: boolean; submitLabel: string; children: ReactNode; wide?: boolean;
+  onSubmit: () => void; busy: boolean; uploading?: boolean; submitLabel: string; children: ReactNode; wide?: boolean;
 }) {
   const formId = useMemo(() => `form-${Math.random().toString(36).slice(2)}`, []);
   return (
@@ -57,14 +57,14 @@ function FormDialog({ open, onOpenChange, title, description, onSubmit, busy, su
       footer={
         <>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
-          <Button type="submit" form={formId} disabled={busy}>{busy ? t("Saving…") : t(submitLabel)}</Button>
+          <Button type="submit" form={formId} disabled={busy || uploading}>{busy ? t("Saving…") : t(submitLabel)}</Button>
         </>
       }
     >
       <form
         id={formId}
         noValidate
-        onSubmit={(e: FormEvent) => { e.preventDefault(); onSubmit(); }}
+        onSubmit={(e: FormEvent) => { e.preventDefault(); if (!busy && !uploading) onSubmit(); }}
         className="grid grid-cols-1 gap-3 sm:grid-cols-2"
       >
         {children}
@@ -74,7 +74,7 @@ function FormDialog({ open, onOpenChange, title, description, onSubmit, busy, su
 }
 
 function ProjectSelect({ value, onChange, error, disabled, optional = false }: { value: string; onChange: (v: string) => void; error?: string; disabled?: boolean; optional?: boolean }) {
-  const { data } = useProjects({ limit: 200 });
+  const { data } = useAllProjects();
   return (
     <Field label="Project" required={!optional} error={error} className="sm:col-span-2">
       {(id) => (
@@ -218,7 +218,7 @@ export function TaskFormDialog({ open, onOpenChange, task, projectId, defaults }
   }, [open, task?.id]);
   const pid = Number(f.values.project_id) || undefined;
   const { data: milestones } = useMilestones(pid);
-  const { data: siblings } = useTasks({ project_id: pid, limit: 200 }, { enabled: !!pid });
+  const { data: siblings } = useAllTasks({ project_id: pid }, { enabled: !!pid });
   const m = useWrite(
     (b: z.infer<typeof taskSchema>) => (task ? api.updateTask(task.id, b) : api.createTask(b)),
     { success: task ? "Task updated" : "Task created", onSuccess: () => onOpenChange(false) },
@@ -292,6 +292,8 @@ export function ExperimentFormDialog({ open, onOpenChange, experiment, projectId
     hypothesis: experiment?.hypothesis ?? "", baseline: experiment?.baseline ?? "", variant: experiment?.variant ?? "",
     description: experiment?.description ?? "", conclusion: experiment?.conclusion ?? "",
   }, [open, experiment?.id]);
+  const [descriptionUploading, setDescriptionUploading] = useState(false);
+  const [conclusionUploading, setConclusionUploading] = useState(false);
   const m = useWrite(
     (b: z.infer<typeof experimentSchema>) => {
       if (experiment) {
@@ -310,7 +312,7 @@ export function ExperimentFormDialog({ open, onOpenChange, experiment, projectId
   };
   const { values: v, errors: e, set } = f;
   return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title={experiment ? "Edit experiment" : "New experiment"} onSubmit={submit} busy={m.isPending} submitLabel={experiment ? "Save" : "Create experiment"} wide>
+    <FormDialog open={open} onOpenChange={onOpenChange} title={experiment ? "Edit experiment" : "New experiment"} uploading={descriptionUploading || conclusionUploading} onSubmit={submit} busy={m.isPending} submitLabel={experiment ? "Save" : "Create experiment"} wide>
       <ProjectSelect value={v.project_id} onChange={(x) => f.setValues((s) => ({ ...s, project_id: x }))} error={e.project_id} disabled={!!experiment} />
       <Field label="Name" required error={e.name} className="sm:col-span-2">{(id) => <Input id={id} value={v.name} onChange={set("name")} autoFocus aria-invalid={!!e.name} placeholder="Ablation: no world model" />}</Field>
       {!experiment && <Field label="Key" error={e.experiment_key} hint="Stable id for agents; derived from name if empty">{(id) => <Input id={id} value={v.experiment_key} onChange={set("experiment_key")} placeholder="ablation-no-world-model" />}</Field>}
@@ -320,8 +322,8 @@ export function ExperimentFormDialog({ open, onOpenChange, experiment, projectId
       <Field label="Baseline">{(id) => <Input id={id} value={v.baseline} onChange={set("baseline")} />}</Field>
       <Field label="Variant">{(id) => <Input id={id} value={v.variant} onChange={set("variant")} />}</Field>
       <Field label="Hypothesis" className="sm:col-span-2">{(id) => <Textarea id={id} value={v.hypothesis} onChange={set("hypothesis")} rows={2} />}</Field>
-      <Field label="Description" className="sm:col-span-2">{(id) => <MarkdownInput id={id} value={v.description} onChange={(x) => f.setValues((s) => ({ ...s, description: x }))} rows={4} />}</Field>
-      <Field label="Conclusion" className="sm:col-span-2">{(id) => <MarkdownInput id={id} value={v.conclusion} onChange={(x) => f.setValues((s) => ({ ...s, conclusion: x }))} rows={3} />}</Field>
+      <Field label="Description" className="sm:col-span-2">{(id) => <MarkdownInput id={id} onUploadStateChange={setDescriptionUploading} value={v.description} onChange={(x) => f.setValues((s) => ({ ...s, description: x }))} rows={4} />}</Field>
+      <Field label="Conclusion" className="sm:col-span-2">{(id) => <MarkdownInput id={id} onUploadStateChange={setConclusionUploading} value={v.conclusion} onChange={(x) => f.setValues((s) => ({ ...s, conclusion: x }))} rows={3} />}</Field>
     </FormDialog>
   );
 }
@@ -376,7 +378,7 @@ export function RunFormDialog({ open, onOpenChange, experimentId, run }: {
     for (const row of metrics) {
       if (!row.name.trim() && !row.value.trim()) continue;
       const num = Number(row.value);
-      if (!row.name.trim() || row.value.trim() === "" || Number.isNaN(num)) {
+      if (!row.name.trim() || row.value.trim() === "" || !Number.isFinite(num)) {
         errors.metrics = "Each metric needs a name and a numeric value";
         break;
       }
@@ -393,6 +395,7 @@ export function RunFormDialog({ open, onOpenChange, experimentId, run }: {
       finished_at: v.finished_at ? new Date(v.finished_at).toISOString() : null,
     };
     if (!run) body.external_run_id = v.external_run_id.trim();
+    else body.metrics_mode = "replace";
     m.mutate(body);
   };
   const { values: v, errors: e, set } = f;

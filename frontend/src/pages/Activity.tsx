@@ -5,7 +5,8 @@ import { Input, Select } from "@/components/ui/form";
 import { Card, EmptyState, ErrorState, Skeleton } from "@/components/ui/misc";
 import { ActivityList } from "@/features/common";
 import { useAppState } from "@/hooks/app-state";
-import { useActivity } from "@/hooks/queries";
+import { useActivityPages } from "@/hooks/queries";
+import { localDayStartISO, localDayEndISO } from "@/lib/utils";
 import { SOURCES } from "@/types/api";
 import { t } from "@/i18n";
 
@@ -21,11 +22,10 @@ export default function ActivityPage() {
   const [since, setSince] = useState("");
   const [until, setUntil] = useState("");
   const [q, setQ] = useState("");
-  const [limit, setLimit] = useState(50);
-  const query = useActivity({
-    project_id: projectFilter ?? undefined, source, event_type: eventType, q, limit,
-    since: since ? new Date(since).toISOString() : undefined,
-    until: until ? new Date(`${until}T23:59:59`).toISOString() : undefined,
+  const query = useActivityPages({
+    project_id: projectFilter ?? undefined, source, event_type: eventType, q,
+    since: localDayStartISO(since),
+    until: localDayEndISO(until),
   });
   return (
     <div className="max-w-4xl space-y-3">
@@ -41,13 +41,14 @@ export default function ActivityPage() {
       </div>
       <Card className="p-4">
         {query.isLoading ? <div className="space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10" />)}</div>
-          : query.isError ? <ErrorState error={query.error} onRetry={() => query.refetch()} />
+          : query.isError && !query.data ? <ErrorState error={query.error} onRetry={() => query.refetch()} />
           : query.data?.items.length ? (
             <>
               <ActivityList events={query.data.items} />
-              {query.data.total > query.data.items.length && (
-                <Button variant="secondary" size="sm" className="mt-3" onClick={() => setLimit((l) => Math.min(l + 50, 200))} disabled={limit >= 200}>
-                  {limit >= 200 ? t("Narrow filters to see older events") : t("Load more ({n})", { n: query.data.total - query.data.items.length })}
+              {query.isError && <ErrorState error={query.error} onRetry={() => query.isFetchNextPageError ? query.fetchNextPage() : query.refetch()} />}
+              {query.hasNextPage && (
+                <Button variant="secondary" size="sm" className="mt-3" onClick={() => query.fetchNextPage()} disabled={query.isFetching}>
+                  {t("Load more ({n})", { n: Math.max(0, query.data.total - query.data.items.length) })}
                 </Button>
               )}
             </>

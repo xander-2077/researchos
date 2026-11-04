@@ -12,7 +12,7 @@ import { Kbd, Spinner } from "@/components/ui/misc";
 import { ProjectIcon } from "@/components/icons/project-icons";
 import { NO_PROJECT, useAppState, type Theme } from "@/hooks/app-state";
 import { useAuth } from "@/hooks/auth";
-import { useProjects } from "@/hooks/queries";
+import { useAllProjects } from "@/hooks/queries";
 import { api } from "@/services/api";
 import { cn, label } from "@/lib/utils";
 import { CreateDialogHost } from "@/features/CreateDialogHost";
@@ -59,7 +59,7 @@ function NavItem({ to, label: l, icon: Icon, end, collapsed, onClose }: (typeof 
 
 /** Plane-style project list in the sidebar (manual order, with each project's icon). */
 function SidebarProjects({ collapsed, onClose }: { collapsed: boolean; onClose: () => void }) {
-  const { data } = useProjects({ sort: "manual", limit: 200 });
+  const { data } = useAllProjects({ sort: "manual" });
   const items = data?.items ?? [];
   if (!items.length) return null;
   return (
@@ -235,7 +235,7 @@ function LanguageToggle() {
 
 function ProjectFilter() {
   const { projectFilter, setProjectFilter } = useAppState();
-  const { data } = useProjects({ limit: 200 });
+  const { data } = useAllProjects();
   return (
     <Select
       aria-label="Project filter"

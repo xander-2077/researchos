@@ -1,6 +1,7 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, ApiError } from "@/services/api";
+import type { Page } from "@/types/api";
 import { t } from "@/i18n";
 
 type Q = Record<string, string | number | boolean | null | undefined>;
@@ -46,3 +47,32 @@ export function useWrite<TVars, TRes>(
 
 export const useProgressList = (projectId: number, q: Q = {}) =>
   useQuery({ queryKey: ["progress", projectId, q], queryFn: () => api.progress(projectId, q), placeholderData: keepPreviousData });
+
+// Separate cache keys keep complete collections distinct from bounded previews.
+export const useAllProjects = (q: Q = {}) =>
+  useQuery({ queryKey: ["projects", "all", q], queryFn: ({ signal }) => api.allProjects(q, signal) });
+export const useAllTasks = (q: Q = {}, opts: { enabled?: boolean } = {}) =>
+  useQuery({ queryKey: ["tasks", "all", q], queryFn: ({ signal }) => api.allTasks(q, signal), enabled: opts.enabled ?? true });
+export const useAllExperiments = (q: Q = {}) =>
+  useQuery({ queryKey: ["experiments", "all", q], queryFn: ({ signal }) => api.allExperiments(q, signal) });
+
+function usePagedEvents<T extends { id: number }>(key: QueryKey, fetchPage: (q: Q) => Promise<Page<T>>, q: Q) {
+  const query = useInfiniteQuery({
+    queryKey: key,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => fetchPage({ ...q, limit: 50, offset: pageParam }),
+    getNextPageParam: (last) => last.items.length && last.offset + last.items.length < last.total
+      ? last.offset + last.items.length : undefined,
+  });
+  const pages = query.data?.pages;
+  return {
+    ...query,
+    data: pages ? {
+      items: [...new Map(pages.flatMap((page) => page.items).map((item) => [item.id, item])).values()],
+      total: pages.at(-1)!.total,
+    } : undefined,
+  };
+}
+export const useActivityPages = (q: Q = {}) => usePagedEvents(["activity", "pages", q], api.activity, q);
+export const useProgressPages = (projectId: number, q: Q = {}) =>
+  usePagedEvents(["progress", projectId, "pages", q], (page) => api.progress(projectId, page), q);

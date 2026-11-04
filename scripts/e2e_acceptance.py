@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
@@ -43,7 +44,7 @@ def step(msg: str) -> None:
 
 def ui_create_project(page: Page, base: str, title: str, stage: str) -> None:
     page.goto(f"{base}/projects")
-    page.get_by_role("button", name="New project").click()
+    page.get_by_role("button", name="New project", exact=True).first.click()
     dlg = page.get_by_role("dialog")
     dlg.get_by_label("Title").fill(title)
     dlg.get_by_label("Stage").select_option(stage)
@@ -68,7 +69,7 @@ def ui_add_milestone_and_task(page: Page, i: int) -> None:
     dlg.get_by_label("Deadline").fill(due)
     dlg.get_by_label("Priority").select_option("high")
     dlg.get_by_role("button", name="Create task").click()
-    expect(page.get_by_text(f"Task {i + 1}: run baseline")).to_be_visible()
+    expect(page.get_by_test_id("kanban-todo").get_by_text(f"Task {i + 1}: run baseline", exact=True)).to_be_visible()
 
 
 def ui_create_token(page: Page, base: str, name: str, scope: str) -> str:
@@ -79,7 +80,7 @@ def ui_create_token(page: Page, base: str, name: str, scope: str) -> str:
     dlg.get_by_label("Scope").select_option(scope)
     dlg.get_by_role("button", name="Create token").click()
     token = dlg.locator("pre").inner_text().strip()
-    dlg.get_by_role("button", name="Done").click()
+    dlg.get_by_role("button", name="Got it", exact=True).click()
     assert token.startswith("ros_"), token
     return token
 
@@ -105,12 +106,14 @@ def main() -> int:
     ap.add_argument("--username", default="admin")
     ap.add_argument("--password", required=True)
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--browser-executable", default=os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE"),
+                    help="Optional system Chrome/Chromium path instead of a Playwright download")
     ap.add_argument("--state-file", default="e2e-state.json")
     a = ap.parse_args()
     base = a.base.rstrip("/")
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not a.headed)
+        browser = pw.chromium.launch(headless=not a.headed, executable_path=a.browser_executable)
         page = browser.new_page(viewport={"width": 1440, "height": 900})
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
@@ -187,7 +190,7 @@ def main() -> int:
         page.get_by_label("Search tasks").fill("Task 2")
         expect(page.locator("tbody tr")).to_have_count(1)
         page.goto(f"{base}/timeline")
-        expect(page.get_by_text("Task 1: run baseline")).to_be_visible()
+        expect(page.get_by_role("button", name="Task 1: run baseline", exact=True)).to_be_visible()
         page.goto(f"{base}/activity")
         page.get_by_label("Source").select_option("codex")
         expect(page.get_by_text("E2E: REST progress note")).to_be_visible()

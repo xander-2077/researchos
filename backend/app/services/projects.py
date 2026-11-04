@@ -184,9 +184,9 @@ def update_project(db: Session, actor: Actor, project_id: int, data: ProjectUpda
     return project
 
 
-def archive_project(db: Session, actor: Actor, project_id: int) -> Project:
+def archive_project(db: Session, actor: Actor, project_id: int, *, confirm: bool = False) -> Project:
     """Soft delete."""
-    return update_project(db, actor, project_id, ProjectUpdate(archived=True, confirm=True))
+    return update_project(db, actor, project_id, ProjectUpdate(archived=True, confirm=confirm))
 
 
 # ------------------------------------------------------------------ summaries

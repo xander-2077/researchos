@@ -6,7 +6,7 @@ import { Card, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/
 import { TaskTable } from "@/features/common";
 import { TaskKanban } from "@/features/kanban";
 import { useAppState } from "@/hooks/app-state";
-import { useTasks } from "@/hooks/queries";
+import { useAllTasks } from "@/hooks/queries";
 import { cn, todayISO } from "@/lib/utils";
 import { PRIORITIES, TASK_STATUSES } from "@/types/api";
 import { t } from "@/i18n";
@@ -47,7 +47,7 @@ export default function TasksPage() {
     all: {},
   }[preset] as Record<string, string | boolean | undefined>;
 
-  const query = useTasks({
+  const query = useAllTasks({
     ...presetQuery,
     project_id: projectFilter ?? undefined,
     ...(status ? { status, open_only: false } : {}),
@@ -56,7 +56,6 @@ export default function TasksPage() {
     ...(dueBefore ? { due_before: dueBefore } : {}),
     q,
     sort: "priority,due_date",
-    limit: 200,
   });
   const items = query.data?.items ?? [];
 

@@ -159,6 +159,7 @@ def dashboard_deadlines(
     start: date | None = Query(None, description="Explicit range start (inclusive), e.g. for a calendar month"),
     end: date | None = Query(None, description="Explicit range end (inclusive)"),
     include_overdue: bool = True,
+    include_archived: bool = False,
     project_id: int | None = Query(None, ge=0, description=PROJECT_ID_DOC),
     kinds: str = Query("submission,milestone,task"),
     limit: int = Query(100, ge=1, le=500),
@@ -173,12 +174,12 @@ def dashboard_deadlines(
 
             raise ValidationFailed("end must be on/after start and the range at most ~2 years")
         return dash_svc.deadlines_between(
-            db, actor, lo, hi, include_overdue=False, project_id=project_id,
+            db, actor, lo, hi, include_overdue=False, include_archived=include_archived, project_id=project_id,
             kinds=tuple(k for k in kinds.split(",") if k), limit=limit,
         )
     return dash_svc.deadlines_between(
         db, actor, today, today + timedelta(days=days), include_overdue=include_overdue,
-        project_id=project_id, kinds=tuple(k for k in kinds.split(",") if k), limit=limit,
+        project_id=project_id, include_archived=include_archived, kinds=tuple(k for k in kinds.split(",") if k), limit=limit,
     )
 
 

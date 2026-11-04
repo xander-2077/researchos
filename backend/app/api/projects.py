@@ -72,8 +72,11 @@ def update_project(project_id: int, data: ProjectUpdate, actor: Actor = Depends(
 
 
 @router.delete("/projects/{project_id}", response_model=ProjectSummary, description="Archives (soft-deletes) the project")
-def delete_project(project_id: int, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
-    p = svc.archive_project(db, actor, project_id)
+def delete_project(
+    project_id: int, confirm: bool = Query(False, description="Explicit confirmation required for agents"),
+    actor: Actor = Depends(get_actor), db: Session = Depends(get_db),
+):
+    p = svc.archive_project(db, actor, project_id, confirm=confirm)
     return svc.project_summary(db, p)
 
 

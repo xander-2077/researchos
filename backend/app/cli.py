@@ -7,8 +7,8 @@ Commands:
   rename-user OLD NEW          Change the admin login name (.env only applies on the very first start)
   create-token NAME [--write] [--days N]   Print a new API token (shown once)
   list-tokens / revoke-token ID
-  backup [PATH]                Consistent online backup via the SQLite backup API
-  restore PATH [--yes]         Restore a backup (stop the server first)
+  backup [PATH]                Consistent SQLite snapshot plus referenced images in uploads/
+  restore PATH [--yes]         Restore database and sibling uploads/ (stop the server first)
   export [PATH]                JSON export of all research data
   prune-uploads [--days N] [--dry-run]   Delete images no note references (the server also does this daily)
   seed-demo                    Insert demo projects (only into an empty database)
@@ -23,6 +23,7 @@ import os
 import shutil
 import sqlite3
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -115,7 +116,7 @@ def backup_to(dest: Path) -> Path:
     if not src_path.exists():
         sys.exit(f"No database at {src_path}")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True)
+    src = sqlite3.connect(src_path.resolve().as_uri() + "?mode=ro", uri=True)
     dst = sqlite3.connect(dest)
     try:
         with dst:
@@ -133,11 +134,22 @@ def backup_to(dest: Path) -> Path:
 
 
 def cmd_backup(a: argparse.Namespace) -> None:
+    from app.services.backup import copy_snapshot_uploads
+
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     dest = Path(a.path) if a.path else get_settings().data_dir / "backups" / f"researchos-{stamp}.db"
     if dest.is_dir():
         dest = dest / f"researchos-{stamp}.db"
-    print(backup_to(dest))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix=".backup-", dir=dest.parent) as staging:
+            staged = backup_to(Path(staging) / "snapshot.db")
+            (dest.parent / "uploads").mkdir(exist_ok=True)
+            copy_snapshot_uploads(staged, get_settings().data_dir / "uploads", dest.parent / "uploads")
+            os.replace(staged, dest)
+    except (OSError, ValueError, sqlite3.Error) as e:
+        sys.exit(f"Backup failed: {e}. No new database snapshot was published.")
+    print(dest)
 
 
 REQUIRED_TABLES = {
@@ -158,7 +170,7 @@ def validate_backup(path: Path) -> str:
     from app.database.migrate import alembic_config
 
     try:
-        conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro&immutable=1", uri=True)
+        conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
     except sqlite3.Error as e:  # pragma: no cover - defensive
         raise BackupInvalid(f"cannot open as SQLite: {e}") from e
     try:
@@ -191,6 +203,8 @@ def validate_backup(path: Path) -> str:
 
 
 def cmd_restore(a: argparse.Namespace) -> None:
+    from app.services.backup import copy_snapshot_uploads
+
     src = Path(a.path)
     if not src.exists():
         sys.exit(f"Backup not found: {src}")
@@ -205,29 +219,39 @@ def cmd_restore(a: argparse.Namespace) -> None:
         if ans.lower() != "y":
             sys.exit("Aborted")
     target.parent.mkdir(parents=True, exist_ok=True)
-    safety = None
-    if target.exists():
-        safety = target.with_name(target.name + f".pre-restore-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}")
-        backup_to(safety)
-        print(f"Saved current database to {safety}")
-    # Stage next to the target and validate the staged copy, so a failure never leaves a half-written DB.
-    staged = target.with_name(target.name + ".restore-tmp")
-    staged.unlink(missing_ok=True)
-    shutil.copyfile(src, staged)
     try:
-        validate_backup(staged)
-        for suffix in ("-wal", "-shm"):
-            Path(str(target) + suffix).unlink(missing_ok=True)
-        os.replace(staged, target)
-        upgrade_to_head(get_settings().sqlalchemy_url)
-    except Exception as e:  # noqa: BLE001 - roll back on any failure
-        staged.unlink(missing_ok=True)
-        if safety is not None:
-            for suffix in ("-wal", "-shm"):
-                Path(str(target) + suffix).unlink(missing_ok=True)
-            os.replace(safety, target)
-            sys.exit(f"Restore failed ({e}); the previous database has been put back.")
-        sys.exit(f"Restore failed: {e}")
+        # Migrate and validate in isolation; the live database is only replaced once
+        # the complete, upgraded snapshot and all of its attachments are ready.
+        with tempfile.TemporaryDirectory(prefix=".restore-", dir=target.parent) as staging:
+            staged = Path(staging) / "researchos.db"
+            shutil.copyfile(src, staged)
+            validate_backup(staged)
+            upgrade_to_head(f"sqlite:///{staged.resolve()}")
+            validate_backup(staged)
+            copy_snapshot_uploads(staged, src.parent / "uploads", get_settings().data_dir / "uploads")
+            safety = None
+            if target.exists():
+                safety = target.with_name(target.name + f".pre-restore-{datetime.now(timezone.utc):%Y%m%dT%H%M%S%fZ}")
+                backup_to(safety)
+                print(f"Saved current database to {safety}")
+            try:
+                for suffix in ("-wal", "-shm"):
+                    Path(str(target) + suffix).unlink(missing_ok=True)
+                os.replace(staged, target)
+            except OSError:
+                # Removing a WAL can discard committed pages from the original DB.
+                # Recover its self-contained snapshot, retaining the safety file.
+                if safety is not None:
+                    try:
+                        shutil.copyfile(safety, staged)
+                        for suffix in ("-wal", "-shm"):
+                            Path(str(target) + suffix).unlink(missing_ok=True)
+                        os.replace(staged, target)
+                    except OSError as recovery_error:
+                        sys.exit(f"Restore recovery failed: {recovery_error}. Original database saved at {safety}.")
+                raise
+    except Exception as e:  # noqa: BLE001 - provide an actionable offline recovery error
+        sys.exit(f"Restore failed: {e}. The current database was not replaced.")
     print(f"Restored {src} → {target}")
 
 

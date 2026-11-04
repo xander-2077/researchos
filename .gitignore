@@ -31,3 +31,14 @@ e2e-state.json
 *.pfx
 id_rsa
 id_ed25519
+
+# Local environment files, restored databases and exported data.
+*.env
+!*.env.example
+.secret_key
+*.db.*
+*.sqlite.*
+*.sqlite3.*
+researchos-data*.tgz
+researchos-data*.tar*
+researchos-export*.json

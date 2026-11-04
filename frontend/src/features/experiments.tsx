@@ -7,8 +7,8 @@ import { Input, Select } from "@/components/ui/form";
 import { Badge, Card, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
 import { DataTable } from "@/features/common";
 import { useAppState } from "@/hooks/app-state";
-import { useExperiments } from "@/hooks/queries";
-import { formatNumber, label, relativeTime } from "@/lib/utils";
+import { useAllExperiments } from "@/hooks/queries";
+import { formatNumber, label, localDayStartISO, localDayEndISO, relativeTime } from "@/lib/utils";
 import { EXPERIMENT_STATUSES, EXPERIMENT_TYPES, type Experiment, type MetricSummary } from "@/types/api";
 import { t } from "@/i18n";
 
@@ -58,7 +58,7 @@ function ExperimentGroupTable({ items, metricCols, showProject }: { items: Exper
 }
 
 /** Filterable experiment registry. Groups by ablation group; metric columns = mean ± std over runs. */
-export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectId?: number | null; initialStatus?: string }) {
+export function ExperimentRegistry({ projectId, initialStatus = "", includeArchived = false }: { projectId?: number | null; initialStatus?: string; includeArchived?: boolean }) {
   const { openCreate } = useAppState();
   const [status, setStatus] = useState(initialStatus);
   const [type, setType] = useState("");
@@ -69,11 +69,11 @@ export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectI
   const [before, setBefore] = useState("");
   const [sort, setSort] = useState("-updated_at");
   const [grouped, setGrouped] = useState<"group" | "flat">("group");
-  const query = useExperiments({
-    project_id: projectId ?? undefined, status, type, q, metric, sort, limit: 200,
+  const query = useAllExperiments({
+    project_id: projectId ?? undefined, status, type, q, metric, sort, include_archived: includeArchived,
     group_name: group || undefined,
-    created_after: after ? new Date(after).toISOString() : undefined,
-    created_before: before ? new Date(`${before}T23:59:59`).toISOString() : undefined,
+    created_after: localDayStartISO(after),
+    created_before: localDayEndISO(before),
   });
   const items = query.data?.items ?? [];
   const allGroups = useMemo(() => Array.from(new Set(items.map((e) => e.group_name).filter(Boolean))).sort(), [items]);

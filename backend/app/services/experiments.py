@@ -241,7 +241,7 @@ def delete_experiment(db: Session, actor: Actor, experiment_id: int) -> None:
 
 
 def _run_fields(data: RunCreate | RunUpdate) -> dict[str, Any]:
-    raw = data.model_dump(exclude_unset=True, exclude={"external_run_id", "confirm_overwrite_verified"})
+    raw = data.model_dump(exclude_unset=True, exclude={"external_run_id", "confirm_overwrite_verified", "metrics_mode"})
     if "config" in raw:
         raw["config_json"] = raw.pop("config") or {}
     if "metrics" in raw:
@@ -254,8 +254,11 @@ def _run_fields(data: RunCreate | RunUpdate) -> dict[str, Any]:
     return raw
 
 
-def _apply_run_changes(db: Session, actor: Actor, run: ExperimentRun, fields: dict[str, Any], confirm: bool) -> list[str]:
-    if "metrics_json" in fields and fields["metrics_json"] is not None:
+def _apply_run_changes(
+    db: Session, actor: Actor, run: ExperimentRun, fields: dict[str, Any], confirm: bool,
+    *, metrics_mode: str = "merge",
+) -> list[str]:
+    if metrics_mode == "merge" and "metrics_json" in fields and fields["metrics_json"] is not None:
         # Merge metrics so partial updates don't drop existing ones.
         merged = dict(run.metrics_json or {})
         merged.update(fields["metrics_json"])
@@ -329,7 +332,9 @@ def upsert_run(
 def update_run(db: Session, actor: Actor, run_id: int, data: RunUpdate) -> ExperimentRun:
     actor.require_write()
     run = get_or_404(db, ExperimentRun, run_id, "Run")
-    changed = _apply_run_changes(db, actor, run, _run_fields(data), data.confirm_overwrite_verified)
+    changed = _apply_run_changes(
+        db, actor, run, _run_fields(data), data.confirm_overwrite_verified, metrics_mode=data.metrics_mode
+    )
     if changed:
         e = run.experiment
         event = "run_verified" if run.verification_status == "verified" and "verification_status" in changed else "run_updated"
@@ -371,7 +376,7 @@ def record_experiment(db: Session, actor: Actor, project_id: int, p: dict[str, A
         exp_fields["name"] = p["experiment_name"]
     run_keys = ("seed", "git_commit", "git_branch", "config", "metrics", "artifact_links", "environment",
                 "run_status", "run_conclusion", "started_at", "finished_at")
-    wants_run = any(p.get(k) is not None for k in run_keys)
+    wants_run = any(k in p for k in run_keys)
     if wants_run and not p.get("external_run_id"):
         raise ValidationFailed(
             "external_run_id is required when recording run data (use e.g. the W&B/MLflow run id, "
@@ -396,7 +401,7 @@ def record_experiment(db: Session, actor: Actor, project_id: int, p: dict[str, A
         run = None
         created_run = False
         if p.get("external_run_id"):
-            run_payload = {k: p[k] for k in run_keys if p.get(k) is not None}
+            run_payload = {k: p[k] for k in run_keys if k in p}
             if "run_status" in run_payload:
                 run_payload["status"] = run_payload.pop("run_status")
             if "run_conclusion" in run_payload:

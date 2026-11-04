@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -354,6 +354,9 @@ class RunCreate(RunBase):
 
 
 class RunUpdate(RunBase):
+    metrics_mode: Literal["merge", "replace"] = Field(
+        default="merge", description="Merge submitted metric keys, or replace all metrics ({} clears)."
+    )
     confirm_overwrite_verified: bool = False
 
 

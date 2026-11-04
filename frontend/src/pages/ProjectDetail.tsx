@@ -18,7 +18,7 @@ import { IconPicker } from "@/components/icons/project-icons";
 import { ExperimentRegistry } from "@/features/experiments";
 import { MilestoneFormDialog, ProjectFormDialog } from "@/features/forms";
 import { useAppState } from "@/hooks/app-state";
-import { useMilestones, useProgressList, useProject, useTasks, useWrite } from "@/hooks/queries";
+import { useMilestones, useProgressList, useProject, useAllTasks, useProgressPages, useWrite } from "@/hooks/queries";
 import { api, type ProjectInput } from "@/services/api";
 import { cn, formatDate, formatDateTime, label, relativeTime } from "@/lib/utils";
 import { t } from "@/i18n";
@@ -153,7 +153,7 @@ function TasksTab({ p }: { p: Project }) {
   const { openCreate } = useAppState();
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [status, setStatus] = useState("");
-  const q = useTasks({ project_id: p.id, status, sort: "priority,due_date", limit: 200 });
+  const q = useAllTasks({ project_id: p.id, include_archived: p.archived, status, sort: "priority,due_date" });
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -172,16 +172,16 @@ function TasksTab({ p }: { p: Project }) {
 
 function ActivityTab({ p }: { p: Project }) {
   const [source, setSource] = useState("");
-  const [limit, setLimit] = useState(50);
-  const q = useProgressList(p.id, { source, limit });
+  const q = useProgressPages(p.id, { source });
   return (
     <div className="max-w-3xl space-y-3">
       <Select aria-label="Source filter" className="w-40" value={source} onChange={(e) => setSource(e.target.value)} options={SOURCES} placeholder="All sources" />
       <Card className="p-4">
-        {q.isLoading ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : q.data?.items.length ? (
+        {q.isLoading ? <Skeleton className="h-40" /> : q.isError && !q.data ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : q.data?.items.length ? (
           <>
             <ActivityList events={q.data.items} showProject={false} />
-            {q.data.total > q.data.items.length && <Button variant="secondary" size="sm" className="mt-3" onClick={() => setLimit((l) => l + 50)}>{t("Load more ({n})", { n: q.data.total - q.data.items.length })}</Button>}
+            {q.isError && <ErrorState error={q.error} onRetry={() => q.isFetchNextPageError ? q.fetchNextPage() : q.refetch()} />}
+            {q.hasNextPage && <Button variant="secondary" size="sm" className="mt-3" disabled={q.isFetching} onClick={() => q.fetchNextPage()}>{t("Load more ({n})", { n: Math.max(0, q.data.total - q.data.items.length) })}</Button>}
           </>
         ) : <EmptyState title="No activity" />}
       </Card>
@@ -193,6 +193,7 @@ function NotesTab({ p }: { p: Project }) {
   const [notes, setNotes] = useState(p.notes);
   const [links, setLinks] = useState(p.links);
   const [editing, setEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
   useEffect(() => { if (!editing) { setNotes(p.notes); setLinks(p.links); } }, [p.notes, p.links, editing]);
   const save = useWrite(() => api.updateProject(p.id, { notes, links: links.filter((l) => l.url.trim()), version: p.version }), {
     success: "Notes saved", onSuccess: () => setEditing(false),
@@ -201,10 +202,10 @@ function NotesTab({ p }: { p: Project }) {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader title="Notes" action={editing ? (
-          <div className="flex gap-2"><Button size="sm" variant="secondary" onClick={() => setEditing(false)}>{t("Cancel")}</Button><Button size="sm" onClick={() => save.mutate(undefined)} disabled={save.isPending}>{t("Save")}</Button></div>
+          <div className="flex gap-2"><Button size="sm" variant="secondary" onClick={() => setEditing(false)}>{t("Cancel")}</Button><Button size="sm" onClick={() => { if (!uploading) save.mutate(undefined); }} disabled={save.isPending || uploading}>{t("Save")}</Button></div>
         ) : <Button size="sm" variant="secondary" onClick={() => setEditing(true)}><Pencil /> {t("Edit")}</Button>} />
         <div className="p-4">
-          {editing ? <MarkdownInput aria-label="Project notes" value={notes} onChange={setNotes} rows={18} className="font-mono text-xs" placeholder="# Ideas, decisions, reading notes…" />
+          {editing ? <MarkdownInput onUploadStateChange={setUploading} aria-label="Project notes" value={notes} onChange={setNotes} rows={18} className="font-mono text-xs" placeholder="# Ideas, decisions, reading notes…" />
             : p.notes ? <Markdown>{p.notes}</Markdown> : <EmptyState icon={<StickyNote className="size-4" />} title="No notes yet" description="Keep lightweight Markdown notes; link out to Overleaf, Notion or Google Docs for long documents." />}
         </div>
       </Card>
@@ -298,8 +299,8 @@ export default function ProjectDetailPage() {
         <TabsContent value="overview"><OverviewTab p={p} /></TabsContent>
         <TabsContent value="milestones"><MilestonesTab p={p} /></TabsContent>
         <TabsContent value="tasks"><TasksTab p={p} /></TabsContent>
-        <TabsContent value="gantt"><GanttChart projectId={p.id} /></TabsContent>
-        <TabsContent value="experiments"><ExperimentRegistry projectId={p.id} /></TabsContent>
+        <TabsContent value="gantt"><GanttChart projectId={p.id} includeArchived={p.archived} /></TabsContent>
+        <TabsContent value="experiments"><ExperimentRegistry projectId={p.id} includeArchived={p.archived} /></TabsContent>
         <TabsContent value="activity"><ActivityTab p={p} /></TabsContent>
         <TabsContent value="notes"><NotesTab p={p} /></TabsContent>
       </Tabs>

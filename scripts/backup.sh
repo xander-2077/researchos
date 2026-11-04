@@ -15,17 +15,20 @@ NAME="researchos-$STAMP.db"
 
 if [[ "${1:-}" == "--local" ]]; then
   (cd backend && .venv/bin/python -m app.cli backup "$OUT_DIR/$NAME")
-  # The app runs from backend/, so a relative RESEARCHOS_DATA_DIR is relative to it.
-  UPLOADS="$(cd backend && realpath -m "${RESEARCHOS_DATA_DIR:-./data}")/uploads"
-  if [[ -d "$UPLOADS" ]]; then mkdir -p "$OUT_DIR/uploads" && cp -rn "$UPLOADS/." "$OUT_DIR/uploads/"; fi
 else
   docker compose exec -T researchos python -m app.cli backup "/data/backups/$NAME" >/dev/null
-  docker compose cp "researchos:/data/backups/$NAME" "$OUT_DIR/$NAME"
-  # Images attached to notes (content-addressed, so a plain mirror is enough)
-  if docker compose exec -T researchos test -d /data/uploads; then
-    mkdir -p "$OUT_DIR/uploads" && docker compose cp "researchos:/data/uploads/." "$OUT_DIR/uploads/"
-  fi
+  STAGE="$(mktemp -d "$OUT_DIR/.backup-XXXXXX")"
+  trap 'rm -rf -- "$STAGE"' EXIT
+  docker compose cp "researchos:/data/backups/$NAME" "$STAGE/$NAME"
+  # Copy the CLI-validated attachments before publishing the host snapshot.
+  mkdir -p "$OUT_DIR/uploads"
+  docker compose cp "researchos:/data/backups/uploads/." "$OUT_DIR/uploads/"
+  mv -- "$STAGE/$NAME" "$OUT_DIR/$NAME"
+  # Only remove this temporary database once all host copies succeeded. The
+  # shared image archive may be used by older backups and must remain intact.
+  docker compose exec -T researchos rm -f -- "/data/backups/$NAME"
 fi
 echo "Backup written to $OUT_DIR/$NAME"
 # Keep the newest 30 local backups
-ls -1t "$OUT_DIR"/researchos-*.db 2>/dev/null | tail -n +31 | xargs -r rm --
+find "$OUT_DIR" -maxdepth 1 -type f -name 'researchos-*.db' -printf '%T@ %p\0' \
+  | sort -z -nr | tail -z -n +31 | cut -z -d ' ' -f 2- | xargs -0 -r rm --

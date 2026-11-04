@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight, Flag, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
-import { useDeadlines, useProjects, useTasks, useWrite } from "@/hooks/queries";
+import { useDeadlines, useAllProjects, useAllTasks, useWrite } from "@/hooks/queries";
 import { ProjectIcon } from "@/components/icons/project-icons";
 import { api } from "@/services/api";
 import { cn, formatDate, parseDate, todayISO } from "@/lib/utils";
@@ -39,7 +39,7 @@ function loadZoom(): Zoom {
 }
 
 /** Gantt chart: tasks grouped by project, drag to move / resize, finish-to-start dependency arrows. */
-export function GanttChart({ projectId }: { projectId: number | null }) {
+export function GanttChart({ projectId, includeArchived = false }: { projectId: number | null; includeArchived?: boolean }) {
   const [zoom, setZoom] = useState<Zoom>(loadZoom);
   const [hideDone, setHideDone] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<number | null>>(new Set());
@@ -51,10 +51,10 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
   const px = PX_PER_DAY[zoom];
   const today = todayISO();
 
-  const tasksQ = useTasks({ limit: 500, sort: "due_date", ...(projectId != null ? { project_id: projectId } : {}) });
-  const projectsQ = useProjects({ include_all: true, limit: 200 });
+  const tasksQ = useAllTasks({ include_archived: includeArchived, sort: "due_date", ...(projectId != null ? { project_id: projectId } : {}) });
+  const projectsQ = useAllProjects({ include_all: true });
   const projectById = useMemo(() => new Map((projectsQ.data?.items ?? []).map((x) => [x.id, x])), [projectsQ.data]);
-  const marksQ = useDeadlines({ days: 730, kinds: "milestone,submission", include_overdue: true, limit: 500, project_id: projectId ?? undefined });
+  const marksQ = useDeadlines({ days: 730, kinds: "milestone,submission", include_overdue: true, include_archived: includeArchived, limit: 200, project_id: projectId ?? undefined });
   const move = useWrite((v: { id: number; span: Span }) => api.updateTask(v.id, { start_date: v.span.start, due_date: v.span.end }));
 
   const changeZoom = (z: Zoom) => {
@@ -214,6 +214,7 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
         </label>
         <Legend />
       </div>
+      <p className="text-xs text-muted-foreground">{t("Milestone and submission markers: overdue and next 730 days, up to 200.")}</p>
       <Card className="overflow-hidden">
         <div ref={scroller} className="max-h-[calc(100vh-15rem)] min-h-[16rem] overflow-auto" data-testid="gantt-scroller">
           <div className={cn("grid", LABEL_W)} style={{ width: "max-content", minWidth: "100%" }}>

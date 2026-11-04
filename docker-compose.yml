@@ -9,14 +9,14 @@ services:
       args:
         # PyPI mirror used during the image build (set PIP_INDEX_URL in .env to change)
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
-    image: researchos:latest
+    image: ${RESEARCHOS_IMAGE:-researchos:latest}
     restart: unless-stopped
     env_file:
-      - path: .env
+      - path: ${RESEARCHOS_ENV_FILE:-.env}
         required: false
     environment:
       RESEARCHOS_DATA_DIR: /data
-      # Also read from .env via interpolation (lets `docker compose --env-file other.env` work).
+      # Interpolation and the container env file must refer to the same deployment.
       RESEARCHOS_ADMIN_PASSWORD: ${RESEARCHOS_ADMIN_PASSWORD:-}
     # Bound to localhost by default. Expose remotely only via an HTTPS reverse proxy or Tailscale
     # (see docs/deployment.md). Never publish this port directly to the internet.

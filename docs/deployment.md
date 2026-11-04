@@ -5,6 +5,7 @@ ResearchOS 使用一个容器提供网页、REST API 和 MCP，SQLite 数据保�
 ## 1. 环境要求
 
 - Docker Engine 24+ 和 Compose 插件：`docker compose version`。
+- Compose 需要 2.24.0+（使用可选环境文件配置）。
 - 原部署估算：镜像约 300 MB，运行内存约 100 MB；以实际构建和运行占用为准。
 - 不使用 Docker 开发时，需要 Python 3.11+ 和 Node 20+。
 
@@ -25,6 +26,16 @@ docker compose ps           # 状态应为 healthy
 ```bash
 docker compose exec researchos python -m app.cli set-password
 ```
+
+默认从根目录 `.env` 读取配置。使用另一份配置时，需同时指定 Compose 插值文件和容器环境文件：
+
+```bash
+RESEARCHOS_ENV_FILE=/path/to/researchos.env docker compose --env-file /path/to/researchos.env up -d --build
+```
+
+也可以在该配置文件中设置 `RESEARCHOS_ENV_FILE=/path/to/researchos.env`，之后仅传 `--env-file`。相对路径以 Compose 文件所在目录为基准。验收环境应另外指定 `RESEARCHOS_VOLUME`、`RESEARCHOS_PORT` 和 `RESEARCHOS_IMAGE`，避免与现有实例共用数据或镜像标签。
+
+应用配置、部署参数、私钥、导出和备份均应保存在忽略目录或仓库外。云服务器反向隧道使用独立的 [环境文件和模板生成步骤](../docker/aliyun/README.md)。
 
 ## 3. 远程访问
 
@@ -154,7 +165,9 @@ scripts/backup.sh                         # 保存至 ./backups/researchos-<UTC�
 scripts/restore.sh backups/researchos-20261102T120000Z.db
 ```
 
-恢复脚本会停止应用，将当前数据库保存为 `researchos.db.pre-restore-<时间>`，再恢复备份、执行迁移并启动应用。
+备份由数据库文件和同目录的 `uploads/` 附件目录组成，迁移到其他机器时应一起复制。宿主机保留最新 30 份数据库备份，容器中的临时数据库副本在复制成功后删除；共享附件归档保留，供旧备份恢复使用。
+
+恢复脚本会停止应用，先在临时目录验证、迁移数据库并检查附件是否齐全、内容校验是否匹配，再合并附件、保存当前数据库的 `researchos.db.pre-restore-<时间>` 副本并替换数据库。缺失或损坏附件会使恢复失败，原数据库保留，应用重新启动。没有图片引用的旧数据库备份仍可直接恢复。
 
 可在宿主机配置每日备份：
 
@@ -199,6 +212,8 @@ scripts/dev.sh                              # 后端 :8000，前端 :5173
 
 打开 `http://127.0.0.1:5173`。Vite 将 `/api` 和 `/mcp` 转发到后端。数据默认存入 `backend/data/`，可通过 `RESEARCHOS_DATA_DIR` 修改。
 
+完整 Docker 验收：先构建镜像，再运行 `scripts/acceptance-docker.sh`。脚本用独立的验收数据库卷，不使用业务数据；验收后自动清理测试卷。使用自定义配置时设置 `RESEARCHOS_ENV_FILE`，脚本会按该配置选择待测镜像。若未安装 Playwright 浏览器，可设置 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 为本机 Chrome/Chromium 可执行文件路径。
+
 ## 8. 配置项
 
 | 环境变量 | 默认值 | 用途 |
@@ -217,5 +232,7 @@ scripts/dev.sh                              # 后端 :8000，前端 :5173
 | `RESEARCHOS_MAX_BODY_BYTES` | `1000000` | 请求体大小上限，字节 |
 | `RESEARCHOS_UPLOAD_MAX_BYTES` | `10000000` | 图片上传大小上限，字节；反向代理的请求体上限需略大于此值 |
 | `RESEARCHOS_BIND` / `RESEARCHOS_PORT` | `127.0.0.1` / `8000` | Compose 监听地址与端口 |
+| `RESEARCHOS_ENV_FILE` | `.env` | 注入容器的环境文件；自定义时与 `--env-file` 指向同一文件 |
+| `RESEARCHOS_IMAGE` / `RESEARCHOS_VOLUME` | `researchos:latest` / `researchos-data` | Compose 镜像标签和数据库卷名称 |
 | `TS_HOSTNAME` / `TS_AUTHKEY` / `TS_EXTRA_ARGS` | `researchos` / 无 / 无 | Tailscale 独立节点名称、认证密钥和附加参数 |
 | `PIP_INDEX_URL` | `https://pypi.tuna.tsinghua.edu.cn/simple` | 构建镜像时使用的 PyPI 镜像源 |

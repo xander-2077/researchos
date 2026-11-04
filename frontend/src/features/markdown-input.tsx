@@ -1,4 +1,4 @@
-import { useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/form";
@@ -12,8 +12,9 @@ const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
 const imagesOf = (list: FileList | null | undefined) => Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
 
 /** Markdown textarea that can take images: button, paste or drop → upload → `![alt](url)` at the caret. */
-export function MarkdownInput({ id, value, onChange, rows = 3, placeholder, className, "aria-label": ariaLabel }: {
+export function MarkdownInput({ id, value, onChange, onUploadStateChange, rows = 3, placeholder, className, "aria-label": ariaLabel }: {
   id?: string; value: string; onChange: (v: string) => void; rows?: number; placeholder?: string; className?: string; "aria-label"?: string;
+  onUploadStateChange?: (uploading: boolean) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -22,6 +23,19 @@ export function MarkdownInput({ id, value, onChange, rows = 3, placeholder, clas
   const touched = useRef(false); // caret position is meaningless until the user has focused the field
   const [busy, setBusy] = useState(0);
   const [over, setOver] = useState(false);
+  const active = useRef(true);
+  const controllers = useRef(new Set<AbortController>());
+  const notify = useRef(onUploadStateChange);
+  notify.current = onUploadStateChange;
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      for (const controller of controllers.current) controller.abort();
+      controllers.current.clear();
+      notify.current?.(false);
+    };
+  }, []);
 
   const insert = (snippet: string) => {
     const el = ref.current;
@@ -36,7 +50,7 @@ export function MarkdownInput({ id, value, onChange, rows = 3, placeholder, clas
     onChange(next);
     const caret = (before + lead + snippet + trail).length;
     requestAnimationFrame(() => {
-      if (!el) return;
+      if (!el?.isConnected || !active.current) return;
       el.focus();
       el.setSelectionRange(caret, caret);
       touched.current = true;
@@ -44,20 +58,35 @@ export function MarkdownInput({ id, value, onChange, rows = 3, placeholder, clas
   };
 
   const upload = async (files: File[]) => {
-    for (const f of files) {
+    const accepted = files.filter((f) => {
       if (f.size > MAX_BYTES) {
         toast.error(t("{name} is larger than 10 MB", { name: f.name || "image" }));
-        continue;
+        return false;
       }
-      setBusy((n) => n + 1);
-      try {
-        const res = await api.uploadImage(f);
-        const alt = (f.name || "image").replace(/\.[a-z0-9]+$/i, "").replace(/[[\]]/g, "") || "image";
-        insert(`![${alt}](${res.url})`);
-      } catch (err) {
-        toast.error(t(err instanceof ApiError ? err.message : "Upload failed"));
-      } finally {
-        setBusy((n) => n - 1);
+      return true;
+    });
+    if (!accepted.length) return;
+    const controller = new AbortController();
+    controllers.current.add(controller);
+    setBusy(controllers.current.size);
+    notify.current?.(true);
+    try {
+      for (const f of accepted) {
+        if (controller.signal.aborted) break;
+        try {
+          const res = await api.uploadImage(f, controller.signal);
+          if (!active.current || controller.signal.aborted) break;
+          const alt = (f.name || "image").replace(/\.[a-z0-9]+$/i, "").replace(/[[\]]/g, "") || "image";
+          insert(`![${alt}](${res.url})`);
+        } catch (err) {
+          if (active.current && !controller.signal.aborted) toast.error(t(err instanceof ApiError ? err.message : "Upload failed"));
+        }
+      }
+    } finally {
+      controllers.current.delete(controller);
+      if (active.current && !controller.signal.aborted) {
+        setBusy(controllers.current.size);
+        notify.current?.(controllers.current.size > 0);
       }
     }
   };

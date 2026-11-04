@@ -9,7 +9,7 @@ import { Badge, Card, CardHeader, EmptyState, ErrorState, Segmented, Skeleton } 
 import { ActivityList, DeadlineList, ProjectTable } from "@/features/common";
 import { SortableProjectGrid } from "@/features/project-grid";
 import { useAppState } from "@/hooks/app-state";
-import { useActivity, useDeadlines, useNeedsReview, useProjects, useSummary } from "@/hooks/queries";
+import { useActivity, useDeadlines, useNeedsReview, useAllProjects, useSummary } from "@/hooks/queries";
 import { cn, relativeTime } from "@/lib/utils";
 import { t } from "@/i18n";
 
@@ -49,8 +49,8 @@ export function Portfolio({ defaultArchived = "active", showArchiveFilter = fals
     try { localStorage.setItem("researchos-portfolio-view", v); } catch { /* ignore */ }
   };
   // Few projects, one order: the manual (drag-and-drop) order is used everywhere.
-  const q = useProjects({
-    sort: "manual", limit: 200,
+  const q = useAllProjects({
+    sort: "manual",
     ...(archived === "all" ? { include_all: true } : { archived: archived === "archived" }),
   });
   return (

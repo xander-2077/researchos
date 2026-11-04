@@ -1,5 +1,7 @@
 // Simplified Chinese. Keys are the English source strings used in the UI.
 export const zh: Record<string, string> = {
+  "Milestone and submission markers: overdue and next 730 days, up to 200.": "里程碑与投稿标记：含已逾期及未来 730 天，最多 200 条。",
+  "The list changed while loading. Please retry.": "列表在加载时发生变化，请重试。",
   "No project": "无项目",
   "Select a project to choose prerequisites": "选择项目后可设置前置任务",
   // ---------------------------------------------------------------- enum labels
