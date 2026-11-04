@@ -213,7 +213,7 @@ class MilestoneOut(ORMModel):
 
 # ---------------------------------------------------------------- Task
 class TaskCreate(Strict):
-    project_id: int
+    project_id: int | None = None
     milestone_id: int | None = None
     client_key: str | None = Field(default=None, max_length=120)
     title: str = Field(min_length=1, max_length=300)
@@ -263,7 +263,7 @@ class TaskUpdate(Strict):
 
 class TaskOut(ORMModel):
     id: int
-    project_id: int
+    project_id: int | None
     milestone_id: int | None
     client_key: str | None
     title: str

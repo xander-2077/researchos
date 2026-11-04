@@ -342,7 +342,7 @@ def project_summary(db: Session, project: Project) -> dict[str, Any]:
     return _summaries(db, [project])[0]
 
 
-def validate_milestone_belongs(db: Session, project_id: int, milestone_id: int | None) -> None:
+def validate_milestone_belongs(db: Session, project_id: int | None, milestone_id: int | None) -> None:
     if milestone_id is None:
         return
     m = db.get(Milestone, milestone_id)

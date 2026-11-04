@@ -125,6 +125,23 @@ describe("create and edit", () => {
     await waitFor(() => expect((screen.getByLabelText("Research stage") as HTMLSelectElement).value).toBe("experimentation"));
   });
 
+  it("creates a task without a project and shows it without a broken project link", async () => {
+    state = installFakeApi({ projects: [] });
+    renderApp("/tasks");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Task" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.selectOptions(within(dialog).getByLabelText("Project"), "");
+    expect(within(dialog).getByRole("option", { name: "No project" })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Milestone")).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/Title/), "Read research methods");
+    await user.click(within(dialog).getByRole("button", { name: "Create task" }));
+    await waitFor(() => expect(state.calls.find((c) => c.path === "/tasks" && c.method === "POST")?.body)
+      .toMatchObject({ project_id: null, milestone_id: null, title: "Read research methods" }));
+    expect(await screen.findByText("Read research methods")).toBeInTheDocument();
+    expect(screen.getByRole("table").querySelector('a[href="/projects/null"]')).toBeNull();
+  });
+
   it("creates a task in a project", async () => {
     state = installFakeApi({ projects: [makeProject({ id: 3, title: "Quadruped Soccer" })] });
     renderApp("/projects/quadruped-soccer?tab=tasks");

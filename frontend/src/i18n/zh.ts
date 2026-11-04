@@ -1,5 +1,7 @@
 // Simplified Chinese. Keys are the English source strings used in the UI.
 export const zh: Record<string, string> = {
+  "No project": "不属于任何项目",
+  "Select a project to choose prerequisites": "选择项目后可设置前置任务",
   // ---------------------------------------------------------------- enum labels
   Ideation: "构思", "Research Design": "研究设计", Implementation: "实现", Experimentation: "实验",
   Analysis: "分析", Writing: "写作", Submission: "投稿", Revision: "修改", Completed: "已完成", "On Hold": "搁置",

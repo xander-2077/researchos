@@ -122,7 +122,7 @@ codex mcp get researchos
 | `list_projects` | 读取 | 查询项目阶段、健康度、进度、截止日期和阻塞；支持阶段、健康度、优先级和归档筛选 |
 | `get_project` | 读取 | 按 ID 或短标识查询项目；`include` 可包含 `milestones`、`tasks`、`experiments`、`progress`、`deadlines` |
 | `query_work` | 读取 | 跨项目查询任务、里程碑、实验和截止日期；支持状态、日期、优先级、关键词；默认查未完成项，最多 100 条 |
-| `upsert_task` | 写入 | 按 `task_id` 或 `client_key` 创建或更新任务，仅修改传入字段；支持 `start_date`（甘特图条形起点）和 `depends_on`（同项目前置任务 id 列表，整体替换，`[]` 清空；自依赖、跨项目、循环依赖会被拒绝） |
+| `upsert_task` | 写入 | 按 `task_id` 或 `client_key` 创建或更新任务，仅修改传入字段；`project` 省略或传 `null` 表示无项目任务；支持 `start_date`（甘特图条形起点）和 `depends_on`（同项目前置任务 id 列表，整体替换，`[]` 清空；自依赖、跨项目、循环依赖会被拒绝） |
 | `upsert_milestone` | 写入 | 创建或更新里程碑 |
 | `record_experiment` | 写入 | 按 `experiment_key` 写入实验，可同时按 `external_run_id` 写入运行；新增结果为待审核 |
 | `log_progress` | 写入 | 追加进展记录 |
@@ -135,7 +135,7 @@ codex mcp get researchos
 - 智能体不能将实验或运行设为 `verified`。
 - 修改已验证结果需 `confirm_overwrite_verified=true`，修改后回到待审核状态。
 - 智能体完成或归档项目、改写已有研究问题或假设，需 `confirm=true`。
-- 任务按 `(project_id, client_key)`、实验按 `(project_id, experiment_key)`、运行按 `(experiment_id, external_run_id)` 去重。
+- 无项目任务共享独立的 `client_key` 去重范围。任务按 `(project_id, client_key)`、实验按 `(project_id, experiment_key)`、运行按 `(experiment_id, external_run_id)` 去重。
 - 读取工具不写入数据；MCP 不提供实验或运行删除工具。
 
 ## 6. 本机 stdio 接入

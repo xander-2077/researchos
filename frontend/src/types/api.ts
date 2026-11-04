@@ -102,7 +102,7 @@ export interface Milestone {
 
 export interface Task {
   id: number;
-  project_id: number;
+  project_id: number | null;
   milestone_id: number | null;
   client_key: string | null;
   title: string;
@@ -208,9 +208,9 @@ export interface DeadlineItem {
   due_date: string;
   status: string | null;
   priority: string | null;
-  project_id: number;
-  project_slug: string;
-  project_title: string;
+  project_id: number | null;
+  project_slug: string | null;
+  project_title: string | null;
   overdue: boolean;
   days_left: number;
 }

@@ -158,7 +158,7 @@ export function TaskKanban({ tasks, showProject = true, onAdd }: { tasks: Task[]
         <PriorityIcon priority={task.priority} />
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span className="truncate">{showProject ? task.project_title : task.milestone_title ?? ""}</span>
+        <span className="truncate">{showProject ? task.project_title ?? t("No project") : task.milestone_title ?? ""}</span>
         {task.due_date && <DueDate date={task.due_date} done={task.status === "done"} className="text-[11px]" />}
       </div>
     </>

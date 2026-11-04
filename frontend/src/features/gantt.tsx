@@ -19,7 +19,7 @@ const HEADER_H = 48;
 type Mode = "move" | "start" | "end";
 
 type Row =
-  | { kind: "project"; key: string; id: number; slug: string; title: string; span: Span | null; done: number; total: number; marks: DeadlineItem[]; top: number; h: number }
+  | { kind: "project"; key: string; id: number | null; slug: string | null; title: string; span: Span | null; done: number; total: number; marks: DeadlineItem[]; top: number; h: number }
   | { kind: "task"; key: string; task: Task; top: number; h: number };
 
 const BAR_TONE: Record<string, string> = {
@@ -42,7 +42,7 @@ function loadZoom(): Zoom {
 export function GanttChart({ projectId }: { projectId: number | null }) {
   const [zoom, setZoom] = useState<Zoom>(loadZoom);
   const [hideDone, setHideDone] = useState(false);
-  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<number | null>>(new Set());
   const [editing, setEditing] = useState<Task | null>(null);
   const [override, setOverride] = useState<Record<number, Span>>({});
   const [drag, setDrag] = useState<{ id: number; mode: Mode; dx: number } | null>(null);
@@ -71,9 +71,9 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
   const { rows, totalH, range } = useMemo(() => {
     const tasks = (tasksQ.data?.items ?? []).filter((x) => x.status !== "cancelled" && !(hideDone && x.status === "done"));
     const marks = marksQ.data ?? [];
-    const groups = new Map<number, { slug: string; title: string; tasks: Task[]; marks: DeadlineItem[] }>();
+    const groups = new Map<number | null, { slug: string | null; title: string; tasks: Task[]; marks: DeadlineItem[] }>();
     for (const x of tasks) {
-      const g = groups.get(x.project_id) ?? { slug: x.project_slug ?? String(x.project_id), title: x.project_title ?? `#${x.project_id}`, tasks: [], marks: [] };
+      const g = groups.get(x.project_id) ?? { slug: x.project_slug, title: x.project_title ?? t("No project"), tasks: [], marks: [] };
       g.tasks.push(x);
       groups.set(x.project_id, g);
     }
@@ -246,8 +246,8 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
                       onClick={() => setCollapsed((s) => { const n = new Set(s); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })}>
                       {collapsed.has(r.id) ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                     </button>
-                    <ProjectIcon icon={projectById.get(r.id)?.icon} color={projectById.get(r.id)?.color} size="xs" />
-                    <Link to={`/projects/${r.slug}`} className="min-w-0 flex-1 truncate text-[13px] font-medium hover:text-primary">{r.title}</Link>
+                    <ProjectIcon icon={projectById.get(r.id ?? -1)?.icon} color={projectById.get(r.id ?? -1)?.color} size="xs" />
+                    <Link to={r.slug ? `/projects/${r.slug}` : "/tasks"} className="min-w-0 flex-1 truncate text-[13px] font-medium hover:text-primary">{r.title}</Link>
                     <span className="shrink-0 text-[11px] text-muted-foreground">{r.done}/{r.total}</span>
                   </div>
                 ) : (

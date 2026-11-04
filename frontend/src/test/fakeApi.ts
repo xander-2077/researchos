@@ -99,7 +99,7 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     if (path === "/tasks" && method === "POST") {
       const p = state.projects.find((x) => x.id === body!.project_id)!;
       const t = { id: nextId++, client_key: null, description: "", tags: [], git_reference: "", notes: "", milestone_id: null, start_date: null, due_date: null, depends_on: [], sort_order: nextId * 1024,
-        created_at: "", updated_at: "", completed_at: null, project_slug: p.slug, project_title: p.title, milestone_title: null, ...body };
+        created_at: "", updated_at: "", completed_at: null, project_slug: p?.slug ?? null, project_title: p?.title ?? null, milestone_title: null, ...body };
       state.tasks.push(t);
       return json(t, 201);
     }

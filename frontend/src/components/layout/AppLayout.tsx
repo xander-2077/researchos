@@ -178,7 +178,7 @@ function GlobalSearch() {
           {results.isLoading && <div className="flex justify-center p-4"><Spinner /></div>}
           {empty && <p className="p-3 text-center text-xs text-muted-foreground">{t("No results for “{term}”", { term })}</p>}
           {r?.projects.length ? <SearchGroup title={t("Projects")}>{r.projects.map((p) => <SearchItem key={p.id} onSelect={() => go(`/projects/${p.slug}`)} title={p.title} meta={label(p.stage)} />)}</SearchGroup> : null}
-          {r?.tasks.length ? <SearchGroup title={t("Tasks")}>{r.tasks.map((t) => <SearchItem key={t.id} onSelect={() => go(`/projects/${t.project_slug}?tab=tasks`)} title={t.title} meta={`${t.project_title} · ${label(t.status)}`} />)}</SearchGroup> : null}
+          {r?.tasks.length ? <SearchGroup title={t("Tasks")}>{r.tasks.map((task) => <SearchItem key={task.id} onSelect={() => go(task.project_slug ? `/projects/${task.project_slug}?tab=tasks` : "/tasks")} title={task.title} meta={`${task.project_title ?? t("No project")} · ${label(task.status)}`} />)}</SearchGroup> : null}
           {r?.experiments.length ? <SearchGroup title={t("Experiments")}>{r.experiments.map((e) => <SearchItem key={e.id} onSelect={() => go(`/experiments/${e.id}`)} title={e.name} meta={`${e.project_title} · ${label(e.status)}`} />)}</SearchGroup> : null}
         </div>
       )}

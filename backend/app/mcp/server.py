@@ -261,7 +261,7 @@ async def query_work(
 @mcp.tool(annotations=WRITE_IDEMPOTENT)
 async def upsert_task(
     ctx: Context,
-    project: ProjectRef,
+    project: ProjectRef | None = None,
     task_id: Annotated[int | None, Field(description="Existing task id to update")] = None,
     client_key: Annotated[
         str | None,
@@ -282,6 +282,7 @@ async def upsert_task(
     git_reference: Annotated[str | None, Field(description="Commit SHA, branch or PR URL")] = None,
 ) -> dict[str, Any]:
     """Create or update a task. Update by task_id, or by client_key; otherwise create.
+    Omit project (or pass null) for a task without a project.
     Only fields you pass are changed."""
 
     fields = {k: v for k, v in {
@@ -291,10 +292,10 @@ async def upsert_task(
     }.items() if v is not None}
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
-        p = proj_svc.resolve_project(db, project)
-        t, created = task_svc.upsert_task(db, actor, p.id, task_id, client_key, fields)
+        p = proj_svc.resolve_project(db, project) if project is not None else None
+        t, created = task_svc.upsert_task(db, actor, p.id if p else None, task_id, client_key, fields)
         return {
-            "task_id": t.id, "project": p.slug, "created": created, "title": t.title, "status": t.status,
+            "task_id": t.id, "project": p.slug if p else None, "created": created, "title": t.title, "status": t.status,
             "priority": t.priority, "start_date": _iso(t.start_date), "due_date": _iso(t.due_date),
             "depends_on": t.depends_on, "milestone_id": t.milestone_id,
             "summary": f"{'Created' if created else 'Updated'} task #{t.id} '{t.title}' ({t.status})"

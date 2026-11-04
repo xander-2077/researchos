@@ -73,12 +73,12 @@ function FormDialog({ open, onOpenChange, title, description, onSubmit, busy, su
   );
 }
 
-function ProjectSelect({ value, onChange, error, disabled }: { value: string; onChange: (v: string) => void; error?: string; disabled?: boolean }) {
+function ProjectSelect({ value, onChange, error, disabled, optional = false }: { value: string; onChange: (v: string) => void; error?: string; disabled?: boolean; optional?: boolean }) {
   const { data } = useProjects({ limit: 200 });
   return (
-    <Field label="Project" required error={error} className="sm:col-span-2">
+    <Field label="Project" required={!optional} error={error} className="sm:col-span-2">
       {(id) => (
-        <Select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} placeholder="Select a project…" aria-invalid={!!error}>
+        <Select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} placeholder={optional ? "No project" : "Select a project…"} aria-invalid={!!error}>
           {data?.items.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
         </Select>
       )}
@@ -192,7 +192,7 @@ export function MilestoneFormDialog({ open, onOpenChange, projectId, milestone }
 
 // ------------------------------------------------------------------ Task
 const taskSchema = z.object({
-  project_id: z.coerce.number({ message: "Project is required" }).int().positive("Project is required"),
+  project_id: z.union([z.literal("").transform(() => null), z.coerce.number().int().positive()]),
   milestone_id: z.string().optional().transform((v) => (v ? Number(v) : null)),
   title: nonEmpty("Title"),
   description: z.string().max(20000),
@@ -231,7 +231,7 @@ export function TaskFormDialog({ open, onOpenChange, task, projectId, defaults }
   const { values: v, errors: e, set } = f;
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title={task ? "Edit task" : "New task"} onSubmit={submit} busy={m.isPending} submitLabel={task ? "Save" : "Create task"} wide>
-      <ProjectSelect value={v.project_id} onChange={(x) => f.setValues((s) => ({ ...s, project_id: x, milestone_id: "" }))} error={e.project_id} />
+      <ProjectSelect optional value={v.project_id} onChange={(x) => f.setValues((s) => ({ ...s, project_id: x, milestone_id: "", depends_on: [] }))} error={e.project_id} />
       <Field label="Title" required error={e.title} className="sm:col-span-2">{(id) => <Input id={id} value={v.title} onChange={set("title")} autoFocus aria-invalid={!!e.title} />}</Field>
       <Field label="Status">{(id) => <Select id={id} value={v.status} onChange={set("status")} options={TASK_STATUSES} />}</Field>
       <Field label="Priority">{(id) => <Select id={id} value={v.priority} onChange={set("priority")} options={PRIORITIES} />}</Field>
@@ -257,7 +257,7 @@ export function TaskFormDialog({ open, onOpenChange, task, projectId, defaults }
                 </label>
               ))}
             </div>
-          ) : <p id={id} className="text-xs text-muted-foreground">{t("No other tasks in this project")}</p>;
+          ) : <p id={id} className="text-xs text-muted-foreground">{t(pid ? "No other tasks in this project" : "Select a project to choose prerequisites")}</p>;
         }}
       </Field>
       <Field label="Tags" hint="Comma-separated">{(id) => <Input id={id} value={v.tags} onChange={set("tags")} placeholder="experiment, sim" />}</Field>

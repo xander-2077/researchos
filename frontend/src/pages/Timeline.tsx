@@ -22,9 +22,9 @@ function Lanes({ items, days }: { items: DeadlineItem[]; days: number }) {
   const start = parseDate(todayISO()).getTime();
   const span = days * 86400000;
   const projects = useMemo(() => {
-    const m = new Map<string, { title: string; slug: string; items: DeadlineItem[] }>();
+    const m = new Map<string | null, { title: string; slug: string | null; items: DeadlineItem[] }>();
     for (const d of items) {
-      const e = m.get(d.project_slug) ?? { title: d.project_title, slug: d.project_slug, items: [] };
+      const e = m.get(d.project_slug) ?? { title: d.project_title ?? t("No project"), slug: d.project_slug, items: [] };
       e.items.push(d);
       m.set(d.project_slug, e);
     }
@@ -41,8 +41,8 @@ function Lanes({ items, days }: { items: DeadlineItem[]; days: number }) {
           ))}
         </div>
         {projects.map((p) => (
-          <div key={p.slug} className="flex items-center border-t border-border py-2">
-            <Link to={`/projects/${p.slug}`} className="w-44 shrink-0 truncate pr-3 text-[13px] font-medium hover:text-primary">{p.title}</Link>
+          <div key={p.slug ?? "no-project"} className="flex items-center border-t border-border py-2">
+            <Link to={p.slug ? `/projects/${p.slug}` : "/tasks"} className="w-44 shrink-0 truncate pr-3 text-[13px] font-medium hover:text-primary">{p.title}</Link>
             <div className="relative h-6 flex-1">
               <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
               {ticks.map((d) => <div key={d} className="absolute top-0 h-full w-px bg-border/60" style={{ left: `${(d / days) * 100}%` }} />)}

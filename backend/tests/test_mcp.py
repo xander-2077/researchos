@@ -216,3 +216,15 @@ async def test_get_project_with_mixed_unit_metrics(live_server: LiveServer):
         res = payload(await cl.call_tool("get_project", {"project": "units", "include": ["experiments"]}))
     m = res["recent_experiments"][0]["metrics"]["latency"]
     assert m == {"mixed_units": ["ms", "s"], "n": 2}  # no misleading mean
+
+
+async def test_standalone_task_mcp_roundtrip(live_server: LiveServer):
+    async with mcp_client(live_server.url, live_server.rw_token) as c:
+        first = payload(await c.call_tool("upsert_task", {"title": "Read methods", "client_key": "methods"}))
+        assert first["project"] is None and first["created"]
+        retry = payload(await c.call_tool("upsert_task", {"project": None, "title": "Read more", "client_key": "methods"}))
+        assert retry["task_id"] == first["task_id"] and not retry["created"]
+        found = payload(await c.call_tool("query_work", {"keyword": "Read more"}))
+        assert found["total"] == 1 and found["items"][0]["project"] is None
+        updated = payload(await c.call_tool("upsert_task", {"task_id": first["task_id"], "status": "done"}))
+        assert updated["status"] == "done"

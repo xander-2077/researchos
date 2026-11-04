@@ -78,9 +78,9 @@ class DeadlineItem(BaseModel):
     due_date: date
     status: str | None = None
     priority: str | None = None
-    project_id: int
-    project_slug: str
-    project_title: str
+    project_id: int | None
+    project_slug: str | None
+    project_title: str | None
     overdue: bool = False
     days_left: int
 

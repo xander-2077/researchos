@@ -24,6 +24,7 @@ def summary(db: Session, actor: Actor, horizon_days: int = 14) -> dict[str, int]
     today = date.today()
     horizon = today + timedelta(days=horizon_days)
     live = Project.archived.is_(False)
+    live_task = Task.project_id.is_(None) | live
 
     def count(stmt) -> int:  # noqa: ANN001
         return db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
@@ -32,14 +33,14 @@ def summary(db: Session, actor: Actor, horizon_days: int = 14) -> dict[str, int]
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     return {
         "active_projects": count(select(Project.id).where(live, Project.stage != "completed")),
-        "open_tasks": count(select(Task.id).join(Project).where(live, Task.status.in_(OPEN_TASK_STATUSES))),
+        "open_tasks": count(select(Task.id).outerjoin(Project).where(live_task, Task.status.in_(OPEN_TASK_STATUSES))),
         "running_experiments": count(
             select(Experiment.id).join(Project).where(live, Experiment.status == "running")
         ),
         "upcoming_deadlines": len(deadlines),
         "blocked_projects": count(select(Project.id).where(live, Project.health_status == "blocked")),
         "overdue_tasks": count(
-            select(Task.id).join(Project).where(live, Task.status.in_(OPEN_TASK_STATUSES), Task.due_date < today)
+            select(Task.id).outerjoin(Project).where(live_task, Task.status.in_(OPEN_TASK_STATUSES), Task.due_date < today)
         ),
         "experiments_needing_review": count(
             select(Experiment.id).join(Project).where(live, Experiment.status == "needs_review")
@@ -85,10 +86,11 @@ def deadlines_between(
     if project_id is not None:
         proj_filter.append(Project.id == project_id)
 
-    def item(kind: str, obj_id: int, title: str, due: date, p: Project, status=None, priority=None):  # noqa: ANN001
+    def item(kind: str, obj_id: int, title: str, due: date, p: Project | None, status=None, priority=None):  # noqa: ANN001
         return {
             "kind": kind, "id": obj_id, "title": title, "due_date": due, "status": status,
-            "priority": priority, "project_id": p.id, "project_slug": p.slug, "project_title": p.title,
+            "priority": priority, "project_id": p.id if p else None,
+            "project_slug": p.slug if p else None, "project_title": p.title if p else None,
             "overdue": due < today, "days_left": (due - today).days,
         }
 
@@ -105,9 +107,12 @@ def deadlines_between(
         ):
             items.append(item("milestone", m.id, m.title, m.due_date, m.project, status=m.status))
     if "task" in kinds:
+        task_filter = [Task.project_id.is_(None) | Project.archived.is_(False)]
+        if project_id is not None:
+            task_filter.append(Task.project_id == project_id)
         for t in db.scalars(
-            select(Task).join(Project).options(joinedload(Task.project))
-            .where(*proj_filter, Task.status.in_(OPEN_TASK_STATUSES), *in_range(Task.due_date))
+            select(Task).outerjoin(Project).options(joinedload(Task.project))
+            .where(*task_filter, Task.status.in_(OPEN_TASK_STATUSES), *in_range(Task.due_date))
         ):
             items.append(item("task", t.id, t.title, t.due_date, t.project, status=t.status, priority=t.priority))
     items.sort(key=lambda i: (i["due_date"], DEADLINE_KINDS.index(i["kind"]), PRIORITY_RANK.get(i["priority"] or "", 9)))
@@ -143,7 +148,7 @@ def query_work(
             q=keyword, sort="due_date,priority", limit=limit,
         )
         return {"resource_type": "task", "total": total, "items": [
-            {"task_id": t.id, "project": t.project.slug, "title": t.title, "status": t.status,
+            {"task_id": t.id, "project": t.project.slug if t.project else None, "title": t.title, "status": t.status,
              "priority": t.priority, "due_date": t.due_date, "milestone_id": t.milestone_id,
              "tags": t.tags, "overdue": bool(t.due_date and t.due_date < date.today() and t.status in OPEN_TASK_STATUSES)}
             for t in rows]}

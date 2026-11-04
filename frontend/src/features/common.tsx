@@ -262,7 +262,7 @@ export function TaskTable({ tasks, showProject = true, empty }: { tasks: Task[];
         </div>
       ) },
     ];
-    if (showProject) c.push({ accessorKey: "project_title", header: t("Project"), cell: ({ row }) => <Link onClick={(e) => e.stopPropagation()} to={`/projects/${row.original.project_slug}`} className="whitespace-nowrap text-muted-foreground hover:text-foreground">{row.original.project_title}</Link> });
+    if (showProject) c.push({ accessorKey: "project_title", header: t("Project"), cell: ({ row }) => row.original.project_slug ? <Link onClick={(e) => e.stopPropagation()} to={`/projects/${row.original.project_slug}`} className="whitespace-nowrap text-muted-foreground hover:text-foreground">{row.original.project_title}</Link> : <span className="text-muted-foreground">{t("No project")}</span> });
     c.push(
       { accessorKey: "status", header: t("Status"), cell: ({ row }) => <TaskStatusSelect task={row.original} /> },
       { accessorKey: "due_date", header: t("Deadline"), sortingFn: (a, b) => (a.original.due_date ?? "9999").localeCompare(b.original.due_date ?? "9999"), cell: ({ row }) => <DueDate date={row.original.due_date} done={row.original.status === "done" || row.original.status === "cancelled"} /> },
@@ -343,7 +343,7 @@ export function DeadlineList({ items, compact }: { items: DeadlineItem[]; compac
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-medium">{d.title}</div>
             <div className="truncate text-[11px] text-muted-foreground">
-              <Link to={`/projects/${d.project_slug}`} className="hover:text-foreground">{d.project_title}</Link> · {label(d.kind)}
+              {d.project_slug ? <Link to={`/projects/${d.project_slug}`} className="hover:text-foreground">{d.project_title}</Link> : t("No project")} · {label(d.kind)}
               {!compact && d.status && <> · {label(d.status)}</>}
             </div>
           </div>

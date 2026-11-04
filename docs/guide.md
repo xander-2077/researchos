@@ -14,7 +14,7 @@ experiments in the browser, and let Claude Code or Codex read and update them ov
 | **Stage** | Ideation → Research Design → Implementation → Experimentation → Analysis → Writing → Submission → Revision → Completed (or On Hold). |
 | **Health** | On Track / At Risk / Blocked. “Blocked Projects” on the overview counts *Blocked*. |
 | **Milestone** | A checkpoint with a clear completion criterion. Progress = completed / non-cancelled milestones; without milestones the UI shows “Not set” rather than a made-up percentage. |
-| **Task** | A concrete to-do; optional milestone, priority, deadline, tags, git reference. |
+| **Task** | A concrete to-do; project is optional (choose **No project**), and can be assigned later. Optional milestone, priority, deadline, tags, git reference. |
 | **Experiment** | One condition (e.g. “Ablation: no world model”). Use **Group** to keep an ablation study together. |
 | **Run** | One execution of an experiment (seed/config): commit, config, metrics, artifact links, verification status. |
 | **Activity** | Append-only research log: progress notes plus every important change, with its source (Manual, Claude Code, Codex, REST API, System). |

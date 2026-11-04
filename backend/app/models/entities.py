@@ -18,6 +18,7 @@ from sqlalchemy import (
     Text,
     TypeDecorator,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -121,10 +122,14 @@ class Milestone(TimestampMixin, Base):
 
 class Task(TimestampMixin, Base):
     __tablename__ = "tasks"
-    __table_args__ = (UniqueConstraint("project_id", "client_key", name="uq_task_client_key"),)
+    __table_args__ = (
+        UniqueConstraint("project_id", "client_key", name="uq_task_client_key"),
+        Index("uq_task_standalone_client_key", "client_key", unique=True,
+              sqlite_where=text("project_id IS NULL"), postgresql_where=text("project_id IS NULL")),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     milestone_id: Mapped[int | None] = mapped_column(
         ForeignKey("milestones.id", ondelete="SET NULL"), index=True
     )
@@ -142,7 +147,7 @@ class Task(TimestampMixin, Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
-    project: Mapped[Project] = relationship(back_populates="tasks")
+    project: Mapped[Project | None] = relationship(back_populates="tasks")
     milestone: Mapped[Milestone | None] = relationship()
     dep_links: Mapped[list["TaskDependency"]] = relationship(
         foreign_keys="TaskDependency.task_id", cascade="all, delete-orphan", passive_deletes=True,

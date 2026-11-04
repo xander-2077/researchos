@@ -101,7 +101,7 @@ export function MonthCalendar({ kinds, projectId }: { kinds: string; projectId?:
                     </span>
                     <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
                       {items.slice(0, 3).map((it) => (
-                        <span key={`${it.kind}-${it.id}`} title={`${it.title} · ${it.project_title}`} className={cn("truncate rounded px-1 py-px text-[11px] leading-4", PILL[it.kind])}>
+                        <span key={`${it.kind}-${it.id}`} title={`${it.title} · ${it.project_title ?? t("No project")}`} className={cn("truncate rounded px-1 py-px text-[11px] leading-4", PILL[it.kind])}>
                           {it.title}
                         </span>
                       ))}

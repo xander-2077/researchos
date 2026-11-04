@@ -49,9 +49,9 @@ def list_tasks(
     offset: int | None = None,
 ):
     actor.require_read()
-    stmt = select(Task).join(Project).options(joinedload(Task.project), joinedload(Task.milestone))
+    stmt = select(Task).outerjoin(Project).options(joinedload(Task.project), joinedload(Task.milestone))
     if not include_archived:
-        stmt = stmt.where(Project.archived.is_(False))
+        stmt = stmt.where(Task.project_id.is_(None) | Project.archived.is_(False))
     if project_id is not None:
         stmt = stmt.where(Task.project_id == project_id)
     if milestone_id is not None:
@@ -166,7 +166,8 @@ def _status_side_effects(db: Session, actor: Actor, t: Task, old: str | None) ->
 
 def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
     actor.require_write()
-    get_or_404(db, Project, data.project_id, "Project")
+    if data.project_id is not None:
+        get_or_404(db, Project, data.project_id, "Project")
     validate_milestone_belongs(db, data.project_id, data.milestone_id)
     if data.client_key:
         existing = db.scalar(
@@ -206,7 +207,8 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
     if not changes:
         return t
     if "project_id" in changes:
-        get_or_404(db, Project, changes["project_id"], "Project")
+        if changes["project_id"] is not None:
+            get_or_404(db, Project, changes["project_id"], "Project")
         if "milestone_id" not in changes:
             changes["milestone_id"] = None
         if "depends_on" not in changes and t.depends_on:
@@ -237,7 +239,7 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
 
 
 def upsert_task(
-    db: Session, actor: Actor, project_id: int, task_id: int | None, client_key: str | None, fields: dict
+    db: Session, actor: Actor, project_id: int | None, task_id: int | None, client_key: str | None, fields: dict
 ) -> tuple[Task, bool]:
     """MCP entry point: update by id, else by (project, client_key), else create.
     Only explicitly provided fields are changed. Returns (task, created)."""
