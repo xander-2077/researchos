@@ -62,7 +62,7 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-5 overflow-x-auto border-b border-border" role="tablist" aria-label="Task presets">
+      <div className="flex items-center gap-5 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)]" role="tablist" aria-label="Task presets">
         {PRESETS.map((p) => (
           <button key={p.id} role="tab" aria-selected={preset === p.id} type="button" onClick={() => setPreset(p.id)}
             className={cn("h-10 shrink-0 cursor-pointer whitespace-nowrap border-b-2 px-0.5 text-[13px] font-medium transition-colors",

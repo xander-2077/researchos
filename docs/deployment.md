@@ -119,7 +119,7 @@ server {
     server_name research.example.com;
     ssl_certificate     /etc/letsencrypt/live/research.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/research.example.com/privkey.pem;
-    client_max_body_size 2m;
+    client_max_body_size 12m;  # 图片上传上限 10 MB
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -215,6 +215,7 @@ scripts/dev.sh                              # 后端 :8000，前端 :5173
 | `RESEARCHOS_RATE_LIMIT_PER_MINUTE` | `600` | 每个 IP 的 API/MCP 每分钟请求上限；0 表示关闭 |
 | `RESEARCHOS_LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | 每个 IP 的每分钟登录请求上限 |
 | `RESEARCHOS_MAX_BODY_BYTES` | `1000000` | 请求体大小上限，字节 |
+| `RESEARCHOS_UPLOAD_MAX_BYTES` | `10000000` | 图片上传大小上限，字节；反向代理的请求体上限需略大于此值 |
 | `RESEARCHOS_BIND` / `RESEARCHOS_PORT` | `127.0.0.1` / `8000` | Compose 监听地址与端口 |
 | `TS_HOSTNAME` / `TS_AUTHKEY` / `TS_EXTRA_ARGS` | `researchos` / 无 / 无 | Tailscale 独立节点名称、认证密钥和附加参数 |
 | `PIP_INDEX_URL` | `https://pypi.tuna.tsinghua.edu.cn/simple` | 构建镜像时使用的 PyPI 镜像源 |

@@ -4,11 +4,12 @@ from datetime import date
 from typing import Any
 
 from sqlalchemy import String, case, cast, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.actor import Actor
 from app.core.enums import OPEN_TASK_STATUSES, PRIORITIES, TASK_STATUSES
-from app.core.errors import NotFound, ValidationFailed
+from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.models import Project, Task, TaskDependency, utcnow
 from app.repositories.base import apply_sort, get_or_404, paginate
 from app.schemas.entities import TaskCreate, TaskUpdate
@@ -185,7 +186,18 @@ def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
     if t.status == "done":
         t.completed_at = utcnow()
     db.add(t)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:  # concurrent retry with the same client_key
+        db.rollback()
+        if data.client_key:
+            existing = db.scalar(
+                select(Task).where(Task.project_id == data.project_id, Task.client_key == data.client_key)
+            )
+            if existing is not None:
+                fields = data.model_dump(exclude_unset=True, exclude={"project_id", "client_key"})
+                return update_task(db, actor, existing.id, TaskUpdate(**fields))
+        raise Conflict("Task was created concurrently; retry the call") from exc
     if deps:
         _set_dependencies(db, t, deps)
     log_event(db, actor, project_id=t.project_id, event_type="task_created",
@@ -242,13 +254,15 @@ def upsert_task(
     db: Session, actor: Actor, project_id: int | None, task_id: int | None, client_key: str | None, fields: dict
 ) -> tuple[Task, bool]:
     """MCP entry point: update by id, else by (project, client_key), else create.
+    project_id=None means "not given" for an id update and "no project" otherwise.
     Only explicitly provided fields are changed. Returns (task, created)."""
     actor.require_write()
     if task_id is not None:
         t = db.get(Task, task_id)
         if t is None:
             raise NotFound(f"Task {task_id} not found")
-        if t.project_id != project_id:
+        # project is optional when updating by id; if given it must match.
+        if project_id is not None and t.project_id != project_id:
             raise ValidationFailed(f"Task {task_id} belongs to project {t.project_id}, not {project_id}")
         return update_task(db, actor, task_id, TaskUpdate(**fields)), False
     if client_key:

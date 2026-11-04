@@ -1,6 +1,6 @@
 // Simplified Chinese. Keys are the English source strings used in the UI.
 export const zh: Record<string, string> = {
-  "No project": "不属于任何项目",
+  "No project": "无项目",
   "Select a project to choose prerequisites": "选择项目后可设置前置任务",
   // ---------------------------------------------------------------- enum labels
   Ideation: "构思", "Research Design": "研究设计", Implementation: "实现", Experimentation: "实验",
@@ -32,7 +32,7 @@ export const zh: Record<string, string> = {
   Light: "浅色", Dark: "深色", Theme: "主题", Language: "语言", "Log out": "退出登录",
   "Expand sidebar": "展开侧边栏", "Collapse sidebar": "收起侧边栏", "Page not found": "页面不存在", "Go to overview": "返回总览",
   "Expand projects": "展开项目", "Collapse projects": "收起项目",
-  "Insert image": "插入图片", "Uploading…": "上传中…", "Upload failed": "上传失败",
+  "Insert image": "插入图片", "Uploading…": "上传中…", "Upload failed": "上传失败", "Image is too large for the server": "图片超出服务器允许的大小",
   "{name} is larger than 10 MB": "{name} 超过 10 MB", "Only PNG, JPEG, GIF and WebP images are accepted": "仅支持 PNG、JPEG、GIF 和 WebP 图片",
 
   // ---------------------------------------------------------------- common UI

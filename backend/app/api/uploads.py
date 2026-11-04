@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import uuid
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, Request
@@ -56,7 +57,7 @@ async def upload_image(request: Request, actor: Actor = Depends(get_actor)):
     name = f"{hashlib.sha256(body).hexdigest()[:32]}.{ext}"
     path = _upload_dir(request) / name
     if not path.exists():  # content-addressed: identical images are stored once
-        tmp = path.with_suffix(".part")
+        tmp = path.with_suffix(f".{uuid.uuid4().hex}.part")  # unique: same image may arrive twice at once
         tmp.write_bytes(body)
         tmp.replace(path)
     return {"url": f"/api/v1/uploads/{name}", "name": name, "size": len(body), "content_type": FORMATS[ext][0]}

@@ -97,3 +97,32 @@ def test_migration_preserves_existing_tasks_dependencies_and_events(ctx, setting
     create(ctx, project_id=None)
     with pytest.raises(RuntimeError, match='Assign standalone tasks'):
         command.downgrade(cfg, '0004')
+
+
+@pytest.mark.parametrize("in_project", [False, True])
+def test_concurrent_create_with_same_client_key_updates_instead_of_500(ctx, monkeypatch, in_project):
+    """Two retries racing past the existence check: the loser updates the winner's task."""
+    from app.auth.actor import Actor
+    from app.schemas.entities import TaskCreate
+    from app.services import tasks as svc
+
+    pid = mkproject(ctx)["id"] if in_project else None
+    winner = create(ctx, client_key="race", project_id=pid)
+    real_scalar = svc.Session.scalar
+    calls = {"n": 0}
+
+    def scalar_missing_first_lookup(self, stmt, *a, **kw):
+        if "client_key" in str(stmt):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return None  # pretend the other request had not committed yet
+        return real_scalar(self, stmt, *a, **kw)
+
+    monkeypatch.setattr(svc.Session, "scalar", scalar_missing_first_lookup)
+    actor = Actor(kind="user", name="admin", source="manual")
+    with SessionLocal() as db:
+        t = svc.create_task(db, actor, TaskCreate(project_id=pid, client_key="race", title="Retry", priority="high"))
+        assert t.id == winner["id"] and t.title == "Retry" and t.priority == "high"
+    monkeypatch.undo()
+    with SessionLocal() as db:
+        assert db.query(Task).filter(Task.client_key == "race").count() == 1

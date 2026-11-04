@@ -45,7 +45,7 @@ docker compose logs tailscale | grep -A1 "To authenticate"   # approve once
 
 See [docs/deployment.md](docs/deployment.md) for details, Caddy/nginx and VPS setups.
 
-**In-app help:** the **Help** page (sidebar, or the lifebuoy icon in the header) shows the user
+**In-app help:** the **Help** page (bottom of the sidebar) shows the user
 guide (English / 简体中文), MCP integration, deployment, architecture and the CLAUDE.md /
 AGENTS.md templates with copy/download buttons.
 

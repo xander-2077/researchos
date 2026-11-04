@@ -106,7 +106,7 @@ export const DropdownLabel = ({ children }: { children: ReactNode }) => (
 // ------------------------------------------------------------------ Tabs
 export const Tabs = TabsPrimitive.Root;
 export function TabsList({ className, ...p }: ComponentProps<typeof TabsPrimitive.List>) {
-  return <TabsPrimitive.List className={cn("flex gap-4 overflow-x-auto border-b border-border", className)} {...p} />;
+  return <TabsPrimitive.List className={cn("flex gap-4 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)]", className)} {...p} />;
 }
 export function TabsTrigger({ className, ...p }: ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (

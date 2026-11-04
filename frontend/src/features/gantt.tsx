@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ChevronRight, Flag } from "lucide-react";
+import { ChevronDown, ChevronRight, Flag, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
 import { useDeadlines, useProjects, useTasks, useWrite } from "@/hooks/queries";
@@ -79,7 +79,8 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
     }
     for (const m of marks) groups.get(m.project_id)?.marks.push(m);
     const start = (x: Task) => taskSpan(x)?.start ?? "9999";
-    const ordered = [...groups.entries()].sort((a, b) => a[1].title.localeCompare(b[1].title));
+    // Projects alphabetically; tasks without a project last.
+    const ordered = [...groups.entries()].sort((a, b) => (a[0] === null ? 1 : 0) - (b[0] === null ? 1 : 0) || a[1].title.localeCompare(b[1].title));
     const out: Row[] = [];
     const spanMap = new Map<number, Span | null>();
     let top = 0;
@@ -246,7 +247,8 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
                       onClick={() => setCollapsed((s) => { const n = new Set(s); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })}>
                       {collapsed.has(r.id) ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                     </button>
-                    <ProjectIcon icon={projectById.get(r.id ?? -1)?.icon} color={projectById.get(r.id ?? -1)?.color} size="xs" />
+                    {r.id === null ? <span className="flex size-5 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground"><Inbox className="size-3" /></span>
+                      : <ProjectIcon icon={projectById.get(r.id)?.icon} color={projectById.get(r.id)?.color} size="xs" />}
                     <Link to={r.slug ? `/projects/${r.slug}` : "/tasks"} className="min-w-0 flex-1 truncate text-[13px] font-medium hover:text-primary">{r.title}</Link>
                     <span className="shrink-0 text-[11px] text-muted-foreground">{r.done}/{r.total}</span>
                   </div>

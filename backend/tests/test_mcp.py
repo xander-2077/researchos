@@ -126,6 +126,12 @@ async def test_write_tools_end_to_end(live_server: LiveServer):
         assert t2["created"] is False and t2["status"] == "in_progress" and t2["priority"] == "high"
         t3 = payload(await c.call_tool("upsert_task", {"project": "quadruped-soccer", "client_key": "sim-abl", "status": "done"}))
         assert t3["task_id"] == t["task_id"] and t3["status"] == "done"
+        # project is optional when updating by id, but must match when given
+        t4 = payload(await c.call_tool("upsert_task", {"task_id": t["task_id"], "priority": "low"}))
+        assert t4["project"] == "quadruped-soccer" and t4["priority"] == "low" and t4["status"] == "done"
+        loose = payload(await c.call_tool("upsert_task", {"title": "Loose end"}))
+        assert "belongs to project" in error_text(await c.call_tool(
+            "upsert_task", {"project": "quadruped-soccer", "task_id": loose["task_id"], "status": "done"}))
         assert "title is required" in error_text(await c.call_tool("upsert_task", {"project": "quadruped-soccer"}))
 
         # milestones

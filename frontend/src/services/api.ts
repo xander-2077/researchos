@@ -83,6 +83,8 @@ async function uploadImage(file: Blob): Promise<UploadedImage> {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     if (res.status === 401) onUnauthorized?.();
+    // A 413 from a reverse proxy has no JSON body; say what actually went wrong.
+    if (res.status === 413) throw new ApiError(413, "payload_too_large", "Image is too large for the server");
     const err = data?.error ?? {};
     throw new ApiError(res.status, err.code ?? "error", err.message ?? `Request failed (${res.status})`, err.details);
   }

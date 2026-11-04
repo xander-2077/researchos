@@ -6,15 +6,17 @@
 #   scripts/backup.sh                # Docker Compose deployment (default)
 #   scripts/backup.sh --local        # bare-metal/dev (uses backend/.venv and RESEARCHOS_DATA_DIR)
 set -euo pipefail
+# Resolve BACKUP_DIR against the caller's directory, then work from the repo root.
+OUT_DIR="$(realpath -m "${BACKUP_DIR:-$(dirname "$0")/../backups}")"
 cd "$(dirname "$0")/.."
-OUT_DIR="${BACKUP_DIR:-./backups}"
 mkdir -p "$OUT_DIR"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 NAME="researchos-$STAMP.db"
 
 if [[ "${1:-}" == "--local" ]]; then
-  (cd backend && .venv/bin/python -m app.cli backup "$(realpath -m "../$OUT_DIR/$NAME")")
-  UPLOADS="${RESEARCHOS_DATA_DIR:-backend/data}/uploads"
+  (cd backend && .venv/bin/python -m app.cli backup "$OUT_DIR/$NAME")
+  # The app runs from backend/, so a relative RESEARCHOS_DATA_DIR is relative to it.
+  UPLOADS="$(cd backend && realpath -m "${RESEARCHOS_DATA_DIR:-./data}")/uploads"
   if [[ -d "$UPLOADS" ]]; then mkdir -p "$OUT_DIR/uploads" && cp -rn "$UPLOADS/." "$OUT_DIR/uploads/"; fi
 else
   docker compose exec -T researchos python -m app.cli backup "/data/backups/$NAME" >/dev/null
