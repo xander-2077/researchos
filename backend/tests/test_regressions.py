@@ -365,10 +365,10 @@ def test_rename_user_changes_login_and_signs_out_sessions(ctx: Ctx):
 
     assert ctx.client.get("/api/v1/projects").status_code == 200
     with SessionLocal() as db:
-        rename_user(db, "admin", "Xander")
+        rename_user(db, "admin", "researcher")
     assert ctx.client.get("/api/v1/projects").status_code == 401  # old session signed out
     other = TestClient(ctx.client.app)
     assert other.post("/api/v1/auth/login", json={"username": "admin", "password": ADMIN_PW}).status_code == 401
-    assert other.post("/api/v1/auth/login", json={"username": "Xander", "password": ADMIN_PW}).status_code == 200
+    assert other.post("/api/v1/auth/login", json={"username": "researcher", "password": ADMIN_PW}).status_code == 200
     with SessionLocal() as db, pytest.raises(Exception, match="not found"):
         rename_user(db, "admin", "x")

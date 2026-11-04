@@ -14,3 +14,20 @@ frontend/dist/
 frontend/*.tsbuildinfo
 .shots/
 e2e-state.json
+
+# Local deployment details, credentials and exports must stay private.
+.private/
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519

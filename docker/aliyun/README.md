@@ -1,47 +1,34 @@
-# 阿里云 IP 访问
+# 云服务器反向隧道部署模板
 
-公网入口：`http://<SERVER_PUBLIC_IP>:10001`。
+本目录提供 Nginx 和 systemd 模板，不包含实际部署地址。安装前替换以下占位符：
+
+| 占位符 | 含义 |
+|---|---|
+| `<SERVER_PUBLIC_IP>` | 云服务器公网地址 |
+| `<SERVER_PRIVATE_IP>` | 云服务器本地网卡地址，用于 Nginx 监听 |
+| `<LOCAL_USER>` | 本机运行 SSH 隧道的用户 |
+| `<SSH_HOST>` | 本机 SSH 配置中的服务器别名 |
+
+## 访问链路
 
 ```text
-手机 / 浏览器
-  │ HTTP
-  ▼
-阿里云公网 IP <SERVER_PUBLIC_IP>:10001
-  │ ECS 公网地址映射
-  ▼
-Nginx <SERVER_PRIVATE_IP>:10001
-  │ 本机 HTTP 代理
-  ▼
-阿里云 127.0.0.1:10001
-  │ SSH 加密反向隧道（本机主动连接 <SSH_HOST>:22）
-  ▼
-<LOCAL_HOST> 127.0.0.1:8000
-  │ Docker 端口映射
-  ▼
-ResearchOS 容器 :8000
-  ├─ 前端页面
-  ├─ REST API /api/v1
-  ├─ MCP /mcp
-  └─ SQLite 数据库 /data（持久化数据卷）
+浏览器 → 云服务器 Nginx :10001
+       → 云服务器回环地址 :10001
+       → SSH 反向隧道
+       → 本机 ResearchOS :8000
 ```
 
-## 保留的服务与配置
+Nginx 绑定服务器网卡地址，SSH 隧道绑定回环地址，避免端口冲突。本机 Docker 保持 `127.0.0.1:8000`，数据存放在持久化卷中。本机需要持续在线。
 
-- 本机 `researchos-tunnel.service`：以 `<LOCAL_USER>` 运行，使用 SSH 配置中的 `<SSH_HOST>`，开机启动、断线自动重连。安装源：`researchos-tunnel.service`。
-- 阿里云 Nginx：站点 `/etc/nginx/sites-available/researchos-ip-http`，通过 `sites-enabled` 链接启用。安装源：`researchos-ip-http.conf`。
-- Nginx 与 SSH 分别绑定私网网卡、回环地址上的 10001，互不冲突。ECS 私网 IP 变化时需更新 Nginx 配置。
-- 本机 Docker：`researchos` 服务仅发布 `127.0.0.1:8000`，数据库保存在持久化数据卷中。
-- Tailscale：`https://<LOCAL_HOST>.<TAILNET>.ts.net:8443 → 本机 127.0.0.1:8000`，与公网 IP 入口并行。Codex MCP 地址仍使用该 HTTPS 地址加 `/mcp`。
+## 配置
 
-应用使用 `RESEARCHOS_COOKIE_SECURE=false` 以支持 HTTP 登录，该设置也影响 Tailscale 会话 Cookie。浏览器到阿里云为明文 HTTP，阿里云到本机为 SSH 加密链路。本机需要持续在线。
+- `researchos-tunnel.service`：替换用户和 SSH 别名，安装到本机 systemd 服务目录；SSH 连接须可非交互认证。
+- `researchos-ip-http.conf`：替换公网和网卡地址，安装到云服务器 Nginx 站点目录。
+- 实际配置、地址和运维记录放在 `.private/` 或仓库外，不要提交。
 
-## 已清理的域名 HTTPS 配置
+此模板的浏览器入口为 HTTP，登录 Cookie 需 `RESEARCHOS_COOKIE_SECURE=false`。远程日常使用优先采用 [HTTPS 或 Tailscale 部署](../../docs/deployment.md#3-远程访问)，HTTPS 下设为 `true`。
 
-2026-11-03 清理 ResearchOS 专属的 `research.example.com` Nginx 站点、证书、续期定时器及服务、ACME 验证目录和部署临时文件，并移除仓库中对应模板。
-
-其他网站使用的 Nginx、Certbot 和证书保留；Tailscale 的 HTTPS 配置保留。Cloudflare 的 `research` DNS 记录不参与 IP 访问，尚未删除，若不再使用可在 Cloudflare 删除。
-
-## 检查与维护
+## 检查
 
 本机：
 
@@ -51,18 +38,11 @@ docker compose ps
 curl -fsS http://127.0.0.1:8000/api/v1/healthz
 ```
 
-阿里云：
+云服务器：
 
 ```bash
 curl -fsS http://127.0.0.1:10001/api/v1/healthz
 sudo nginx -t
-ss -ltn '( sport = :10001 )'
 ```
 
-外部设备：
-
-```bash
-curl -fsS http://<SERVER_PUBLIC_IP>:10001/api/v1/healthz
-```
-
-更新 Nginx 配置后，先执行 `sudo nginx -t`，通过后执行 `sudo systemctl reload nginx`。
+修改 Nginx 配置后，先检查配置，通过后再执行 `sudo systemctl reload nginx`。
