@@ -11,6 +11,7 @@ describe("localizeSummary", () => {
     expect(localizeSummary("Run wandb-1 recorded for 'No WM' (seed 0): goal_rate=0.52", "run_recorded"))
       .toBe("记录运行 wandb-1（实验“No WM”，种子 0）：goal_rate=0.52");
     expect(localizeSummary("Project updated: next_action, priority", "project_updated")).toBe("项目已更新：下一步行动、优先级");
+    expect(localizeSummary("Member left: alice", "member_left")).toBe("成员退出：alice");
     expect(localizeSummary("Task created: anything", "progress_note")).toBe("Task created: anything");
     localStorage.removeItem("researchos-lang");
   });

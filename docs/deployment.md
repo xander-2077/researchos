@@ -236,3 +236,34 @@ scripts/dev.sh                              # 后端 :8000，前端 :5173
 | `RESEARCHOS_IMAGE` / `RESEARCHOS_VOLUME` | `researchos:latest` / `researchos-data` | Compose 镜像标签和数据库卷名称 |
 | `TS_HOSTNAME` / `TS_AUTHKEY` / `TS_EXTRA_ARGS` | `researchos` / 无 / 无 | Tailscale 独立节点名称、认证密钥和附加参数 |
 | `PIP_INDEX_URL` | `https://pypi.tuna.tsinghua.edu.cn/simple` | 构建镜像时使用的 PyPI 镜像源 |
+
+
+## 用户数据的保存位置与配置
+
+所有账号共用 SQLite 数据库，并非每个用户一个目录。`researchos.db` 保存账号、密码哈希、项目、成员关系、邀请与令牌哈希；`uploads/` 保存图片，`.secret_key` 保存未通过环境变量指定的会话签名密钥。
+
+默认 Compose 使用 `researchos-data` 数据卷，容器内目录为 `/data`。查看宿主机实际目录：
+
+```bash
+docker volume inspect researchos-data --format '{{.Mountpoint}}'
+```
+
+Linux 默认通常是 `/var/lib/docker/volumes/researchos-data/_data`；Docker Desktop 的目录位于其虚拟机中。重建容器不会删除此数据卷。可在 `.env` 设置 `RESEARCHOS_VOLUME=researchos-data` 选择命名卷；换一个卷名会连接另一份数据，不会自动搬迁旧数据。
+
+若需要保存到指定宿主机目录，在项目 `.env` 中设置：
+
+```dotenv
+RESEARCHOS_HOST_DATA_DIR=/mnt/researchos-data
+```
+
+Compose 会自动将该目录挂载到容器内 `/data`，后续不必重复指定路径或使用额外配置文件。新安装先准备目录：
+
+```bash
+sudo mkdir -p /mnt/researchos-data
+sudo chown 10001:10001 /mnt/researchos-data
+docker compose up -d --build researchos
+```
+
+已有数据必须先保持旧配置，执行 `scripts/backup.sh` 并停止应用，将原容器 `/data` 的完整内容复制到一个空的目标目录（包括数据库、图片和隐藏密钥文件），确认目录归属为 `10001:10001`，再修改 `.env` 并重建容器。空目录不会自动继承原有账号和项目。完整迁移及挂载验证命令见 [README](../README.md#store-data-in-mntresearchos-data)。
+
+直接在本机运行后端时，数据目录由 `.env` 的 `RESEARCHOS_DATA_DIR=/absolute/path/to/data` 指定；未配置时相对于启动目录使用 `./data`，从 `backend/` 启动即 `backend/data/`。`RESEARCHOS_DATABASE_URL` 若显式配置，会覆盖数据库路径，但不会改变图片目录。Compose 已将数据目录固定为容器内 `/data`，要调整宿主机存储位置应修改挂载，而不是只修改 `RESEARCHOS_DATA_DIR`。

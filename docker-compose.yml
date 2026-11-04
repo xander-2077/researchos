@@ -23,7 +23,7 @@ services:
     ports:
       - "${RESEARCHOS_BIND:-127.0.0.1}:${RESEARCHOS_PORT:-8000}:8000"
     volumes:
-      - researchos-data:/data
+      - ${RESEARCHOS_HOST_DATA_DIR:-researchos-data}:/data
     read_only: true
     tmpfs:
       - /tmp

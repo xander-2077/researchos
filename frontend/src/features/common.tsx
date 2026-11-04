@@ -5,15 +5,17 @@ import {
 } from "@tanstack/react-table";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { toast } from "sonner";
 import {
   AlertOctagon, ArrowDown, ArrowUp, Bot, CalendarClock, CheckCircle2, ChevronsUpDown, CircleDot, Flag, FlaskConical,
-  GitCommitHorizontal, ListTodo, MoreHorizontal, NotebookPen, Pencil, Terminal, Trash2, User,
+  FolderKanban, GitCommitHorizontal, ListTodo, MoreHorizontal, NotebookPen, Pencil, Terminal, Trash2, User, UserPlus, UserMinus,
 } from "lucide-react";
 import { Badge, ProgressBar } from "@/components/ui/misc";
 import { ProjectIcon } from "@/components/icons/project-icons";
 import { Button } from "@/components/ui/button";
 import { DropdownContent, DropdownItem, DropdownMenu, DropdownSeparator, DropdownTrigger, ConfirmDialog } from "@/components/ui/overlay";
 import { useWrite } from "@/hooks/queries";
+import { useAuth } from "@/hooks/auth";
 import { api } from "@/services/api";
 import { cn, daysUntil, dueLabel, formatDate, formatDateTime, label, relativeTime } from "@/lib/utils";
 import { TASK_STATUSES, type ActivityEvent, type DeadlineItem, type Project, type Task, type TaskStatus } from "@/types/api";
@@ -286,6 +288,7 @@ export function TaskTable({ tasks, showProject = true, empty }: { tasks: Task[];
 
 // ------------------------------------------------------------------ activity
 const EVENT_ICON: Record<string, ReactNode> = {
+  member_added: <UserPlus />, member_removed: <UserMinus />, member_left: <UserMinus />,
   progress_note: <NotebookPen />, task_completed: <CheckCircle2 />, milestone_completed: <Flag />,
   experiment_created: <FlaskConical />, run_recorded: <FlaskConical />, run_updated: <FlaskConical />, run_verified: <CheckCircle2 />,
   stage_changed: <CircleDot />, task_created: <ListTodo />, project_created: <CircleDot />,
@@ -301,7 +304,40 @@ export function SourceBadge({ source, actor }: { source: string; actor?: string 
 }
 
 export function ActivityList({ events, showProject = true, compact }: { events: ActivityEvent[]; showProject?: boolean; compact?: boolean }) {
+  if (!showProject) return <ActivityEvents events={events} compact={compact} />;
+  const groups = new Map<number | null, ActivityEvent[]>();
+  for (const event of events) {
+    const group = groups.get(event.project_id);
+    if (group) group.push(event);
+    else groups.set(event.project_id, [event]);
+  }
+  return <ul className="space-y-5">
+    {[...groups].map(([projectId, items]) => {
+      const first = items[0];
+      const title = projectId === null ? t("Personal tasks") : first.project_title ?? t("Project");
+      return <li key={projectId ?? "personal"}>
+        <section aria-label={title}>
+          <h3 className="mb-3 flex items-center gap-2 text-[13px] font-medium">
+            {projectId === null ? <ListTodo className="size-4 text-muted-foreground" /> : <FolderKanban className="size-4 text-muted-foreground" />}
+            {projectId === null ? title : <Link to={`/projects/${first.project_slug ?? projectId}`} className="hover:text-primary">{title}</Link>}
+          </h3>
+          <div className="ml-2 border-l border-border pl-4"><ActivityEvents events={items} compact={compact} /></div>
+        </section>
+      </li>;
+    })}
+  </ul>;
+}
+
+function ActivityEvents({ events, compact }: { events: ActivityEvent[]; compact?: boolean }) {
   const [open, setOpen] = useState<number | null>(null);
+  const { me } = useAuth();
+  const restore = useWrite((id: number) => api.restoreActivity(id), { success: "Activity restored" });
+  const remove = useWrite((id: number) => api.deleteActivity(id), {
+    onSuccess: (_, id) => toast.success(t("Activity deleted"), {
+      action: { label: t("Undo"), onClick: () => restore.mutate(id) },
+      duration: 10000,
+    }),
+  });
   return (
     <ol className="relative">
       {events.map((e, i) => (
@@ -317,13 +353,18 @@ export function ActivityList({ events, showProject = true, compact }: { events: 
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
               <time dateTime={e.created_at} title={formatDateTime(e.created_at)}>{compact ? relativeTime(e.created_at) : formatDateTime(e.created_at)}</time>
-              {showProject && e.project_slug && <Link to={`/projects/${e.project_slug}`} className="hover:text-foreground">{e.project_title}</Link>}
+              {e.actor && <span>{e.actor}</span>}
               <SourceBadge source={e.source} actor={e.actor} />
               {!compact && <span className="rounded bg-muted px-1">{label(e.event_type)}</span>}
               {e.details && <button type="button" className="cursor-pointer text-primary hover:underline" onClick={() => setOpen(open === e.id ? null : e.id)}>{open === e.id ? t("Hide details") : t("Details")}</button>}
             </div>
             {open === e.id && e.details && <div className="mt-2 rounded-md border border-border bg-muted/40 p-3"><Markdown>{e.details}</Markdown></div>}
           </div>
+          {me?.is_admin && <Button variant="ghost" size="icon" aria-label={t(e.deleted_at ? "Restore activity" : "Delete activity")}
+            disabled={remove.isPending || restore.isPending}
+            onClick={() => e.deleted_at ? restore.mutate(e.id) : remove.mutate(e.id)}>
+            {e.deleted_at ? t("Restore") : <Trash2 className="size-3.5" />}
+          </Button>}
         </li>
       ))}
     </ol>

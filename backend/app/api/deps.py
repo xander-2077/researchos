@@ -27,7 +27,9 @@ def actor_from_bearer(db: Session, header_value: str, source_header: str | None,
         raise Unauthorized("Use 'Authorization: Bearer <token>'")
     tok = verify_token(db, token.strip())
     source = infer_agent_source(tok.name, source_header, default_source)
-    return Actor(kind="token", name=f"token:{tok.name}", source=source, scopes=frozenset(tok.scope_list), token_id=tok.id)
+    user = db.get(User, tok.user_id) if tok.user_id is not None else None
+    return Actor(kind="token", name=f"token:{tok.name}", source=source, scopes=frozenset(tok.scope_list),
+                 token_id=tok.id, user_id=tok.user_id, is_admin=user.is_admin if user else True)
 
 
 def get_actor(request: Request, db: Session = Depends(get_db)) -> Actor:
@@ -45,10 +47,10 @@ def get_actor(request: Request, db: Session = Depends(get_db)) -> Actor:
         if not expected or not secrets.compare_digest(expected, got):
             raise Forbidden("Missing or invalid CSRF token", code="csrf_failed")
     user = db.get(User, uid)
-    if user is None or request.session.get("sv") != user.session_version:
+    if user is None or not user.is_active or request.session.get("sv") != user.session_version:
         # unknown user, or the password was changed after this session was issued
         request.session.clear()
         raise Unauthorized("Session expired")
-    actor = Actor(kind="user", name=user.username, source="manual")
+    actor = Actor(kind="user", name=user.username, source="manual", user_id=user.id, is_admin=user.is_admin)
     request.state.actor = actor
     return actor

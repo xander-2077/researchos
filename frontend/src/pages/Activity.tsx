@@ -6,6 +6,7 @@ import { Card, EmptyState, ErrorState, Skeleton } from "@/components/ui/misc";
 import { ActivityList } from "@/features/common";
 import { useAppState } from "@/hooks/app-state";
 import { useActivityPages } from "@/hooks/queries";
+import { useAuth } from "@/hooks/auth";
 import { localDayStartISO, localDayEndISO } from "@/lib/utils";
 import { SOURCES } from "@/types/api";
 import { t } from "@/i18n";
@@ -13,9 +14,12 @@ import { t } from "@/i18n";
 const EVENT_TYPES = [
   "progress_note", "project_created", "stage_changed", "health_changed", "task_created", "task_completed",
   "milestone_created", "milestone_completed", "experiment_created", "run_recorded", "run_verified",
+  "member_added", "member_removed", "member_left",
 ];
 
 export default function ActivityPage() {
+  const { me } = useAuth();
+  const [deleted, setDeleted] = useState(false);
   const { projectFilter } = useAppState();
   const [source, setSource] = useState("");
   const [eventType, setEventType] = useState("");
@@ -23,6 +27,7 @@ export default function ActivityPage() {
   const [until, setUntil] = useState("");
   const [q, setQ] = useState("");
   const query = useActivityPages({
+    deleted: me?.is_admin && deleted,
     project_id: projectFilter ?? undefined, source, event_type: eventType, q,
     since: localDayStartISO(since),
     until: localDayEndISO(until),
@@ -30,6 +35,7 @@ export default function ActivityPage() {
   return (
     <div className="max-w-4xl space-y-3">
       <div className="ros-toolbar">
+        {me?.is_admin && <Button variant="secondary" size="sm" aria-pressed={deleted} onClick={() => setDeleted(!deleted)}>{t(deleted ? "Back to activity" : "Deleted activity")}</Button>}
         <div className="relative w-56">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input aria-label="Search activity" className="pl-8" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />

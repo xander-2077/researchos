@@ -4,15 +4,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.actor import Actor
-from app.models import Milestone, Project, Task, utcnow
-from app.repositories.base import get_or_404
+from app.models import Milestone, Task, utcnow
 from app.schemas.entities import MilestoneCreate, MilestoneUpdate
 from app.services.activity import log_event
+from app.services.access import project_resource, require_project
+from app.services.uploads import share_uploads
 
 
 def list_milestones(db: Session, actor: Actor, project_id: int) -> list[Milestone]:
     actor.require_read()
-    get_or_404(db, Project, project_id, "Project")
+    require_project(db, actor, project_id)
     stmt = (
         select(Milestone)
         .where(Milestone.project_id == project_id)
@@ -23,12 +24,13 @@ def list_milestones(db: Session, actor: Actor, project_id: int) -> list[Mileston
 
 def create_milestone(db: Session, actor: Actor, project_id: int, data: MilestoneCreate) -> Milestone:
     actor.require_write()
-    get_or_404(db, Project, project_id, "Project")
+    require_project(db, actor, project_id)
     m = Milestone(project_id=project_id, **data.model_dump())
     if m.status == "completed":
         m.completed_at = utcnow()
     db.add(m)
     db.flush()
+    share_uploads(db, actor, project_id, m.description)
     log_event(
         db, actor, project_id=project_id, event_type="milestone_created",
         summary=f"Milestone added: {m.title}", resource_type="milestone", resource_id=m.id,
@@ -40,11 +42,12 @@ def create_milestone(db: Session, actor: Actor, project_id: int, data: Milestone
 
 def update_milestone(db: Session, actor: Actor, milestone_id: int, data: MilestoneUpdate) -> Milestone:
     actor.require_write()
-    m = get_or_404(db, Milestone, milestone_id, "Milestone")
+    m = project_resource(db, actor, Milestone, milestone_id, "Milestone")
     changes = {k: v for k, v in data.model_dump(exclude_unset=True).items() if getattr(m, k) != v}
     if not changes:
         return m
     old_status = m.status
+    share_uploads(db, actor, m.project_id, changes.get("description", "") or "")
     for k, v in changes.items():
         setattr(m, k, v)
     if "status" in changes:
@@ -78,7 +81,7 @@ def upsert_milestone(
 ) -> tuple[Milestone, bool]:
     """Used by MCP. Returns (milestone, created)."""
     if milestone_id is not None:
-        m = get_or_404(db, Milestone, milestone_id, "Milestone")
+        m = project_resource(db, actor, Milestone, milestone_id, "Milestone")
         if m.project_id != project_id:
             from app.core.errors import ValidationFailed
 
@@ -89,7 +92,7 @@ def upsert_milestone(
 
 def delete_milestone(db: Session, actor: Actor, milestone_id: int) -> None:
     actor.require_write()
-    m = get_or_404(db, Milestone, milestone_id, "Milestone")
+    m = project_resource(db, actor, Milestone, milestone_id, "Milestone")
     # Tasks keep existing; their milestone link is cleared (FK ON DELETE SET NULL).
     for t in db.scalars(select(Task).where(Task.milestone_id == m.id)):
         t.milestone_id = None

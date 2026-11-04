@@ -9,12 +9,14 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth.actor import Actor
 from app.core.enums import OPEN_TASK_STATUSES, PRIORITIES, TASK_STATUSES
-from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.errors import Conflict, ValidationFailed
 from app.models import Project, Task, TaskDependency, utcnow
-from app.repositories.base import apply_sort, by_project, get_or_404, paginate
+from app.repositories.base import apply_sort, by_project, paginate
 from app.schemas.entities import TaskCreate, TaskUpdate
 from app.services.activity import log_event
+from app.services.access import project_resource, require_project, task_filter
 from app.services.projects import validate_milestone_belongs
+from app.services.uploads import share_uploads
 
 SORTABLE = {"title", "status", "priority", "sort_order", "start_date", "due_date", "created_at", "updated_at"}
 _PRIORITY_ORDER = case({"critical": 0, "high": 1, "medium": 2, "low": 3}, value=Task.priority, else_=9)
@@ -50,7 +52,7 @@ def list_tasks(
     offset: int | None = None,
 ):
     actor.require_read()
-    stmt = select(Task).outerjoin(Project).options(joinedload(Task.project), joinedload(Task.milestone))
+    stmt = select(Task).where(task_filter(actor)).outerjoin(Project).options(joinedload(Task.project), joinedload(Task.milestone))
     if not include_archived:
         stmt = stmt.where(Task.project_id.is_(None) | Project.archived.is_(False))
     if project_id is not None:
@@ -110,7 +112,10 @@ def _set_dependencies(db: Session, t: Task, ids: list[int]) -> None:
     if t.id in want:
         raise ValidationFailed("A task cannot depend on itself")
     if want:
-        rows = db.execute(select(Task.id, Task.project_id).where(Task.id.in_(want))).all()
+        prerequisites = select(Task.id, Task.project_id).where(Task.id.in_(want))
+        if t.project_id is None:
+            prerequisites = prerequisites.where(Task.owner_id == t.owner_id)
+        rows = db.execute(prerequisites).all()
         found = {r.id: r.project_id for r in rows}
         missing = [i for i in want if i not in found]
         if missing:
@@ -147,7 +152,7 @@ def _check_dates(start: date | None, due: date | None) -> None:
 
 def get_task(db: Session, actor: Actor, task_id: int) -> Task:
     actor.require_read()
-    return get_or_404(db, Task, task_id, "Task")
+    return project_resource(db, actor, Task, task_id, "Task")
 
 
 def _status_side_effects(db: Session, actor: Actor, t: Task, old: str | None) -> None:
@@ -169,17 +174,17 @@ ORDER_GAP = 1024.0
 MIN_ORDER_GAP = 1e-3  # ~20 drops into the same slot; floats would collide after ~50
 
 
-def _renumber_if_crowded(db: Session, t: Task) -> None:
+def _renumber_if_crowded(db: Session, actor: Actor, t: Task) -> None:
     """Kanban drops use the midpoint of the neighbours' sort_order, which halves the gap each
-    time. When the moved card gets too close to (or ties with) a neighbour, respace every task
-    to multiples of ORDER_GAP, keeping the global order. Not an edit: updated_at is untouched."""
-    others = select(Task.sort_order).where(Task.id != t.id)
+    time. When the moved card gets too close to (or ties with) a neighbour, respace every accessible task
+    to multiples of ORDER_GAP, keeping the order among accessible tasks. Not an edit: updated_at is untouched."""
+    others = select(Task.sort_order).where(Task.id != t.id, task_filter(actor))
     below = db.scalar(others.where(Task.sort_order <= t.sort_order).order_by(Task.sort_order.desc()).limit(1))
     above = db.scalar(others.where(Task.sort_order >= t.sort_order).order_by(Task.sort_order).limit(1))
     gaps = [abs(t.sort_order - x) for x in (below, above) if x is not None]
     if not gaps or min(gaps) >= MIN_ORDER_GAP:
         return
-    ids = db.scalars(select(Task.id).order_by(Task.sort_order, Task.id)).all()
+    ids = db.scalars(select(Task.id).where(task_filter(actor)).order_by(Task.sort_order, Task.id)).all()
     for pos, tid in enumerate(ids, start=1):
         db.execute(
             update(Task).where(Task.id == tid)
@@ -191,11 +196,12 @@ def _renumber_if_crowded(db: Session, t: Task) -> None:
 def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
     actor.require_write()
     if data.project_id is not None:
-        get_or_404(db, Project, data.project_id, "Project")
+        require_project(db, actor, data.project_id)
     validate_milestone_belongs(db, data.project_id, data.milestone_id)
     if data.client_key:
         existing = db.scalar(
-            select(Task).where(Task.project_id == data.project_id, Task.client_key == data.client_key)
+            select(Task).where(Task.project_id == data.project_id, Task.client_key == data.client_key,
+                                   Task.owner_id == actor.user_id if data.project_id is None else True)
         )
         if existing is not None:
             # Idempotent retry: update instead of duplicating.
@@ -204,8 +210,8 @@ def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
     fields = data.model_dump()
     deps = fields.pop("depends_on")
     if fields.get("sort_order") is None:
-        fields["sort_order"] = (db.scalar(select(func.max(Task.sort_order))) or 0) + ORDER_GAP
-    t = Task(**fields)
+        fields["sort_order"] = (db.scalar(select(func.max(Task.sort_order)).where(task_filter(actor))) or 0) + ORDER_GAP
+    t = Task(owner_id=actor.user_id, **fields)
     if t.status == "done":
         t.completed_at = utcnow()
     db.add(t)
@@ -215,12 +221,14 @@ def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
         db.rollback()
         if data.client_key:
             existing = db.scalar(
-                select(Task).where(Task.project_id == data.project_id, Task.client_key == data.client_key)
+                select(Task).where(Task.project_id == data.project_id, Task.client_key == data.client_key,
+                                   Task.owner_id == actor.user_id if data.project_id is None else True)
             )
             if existing is not None:
                 fields = data.model_dump(exclude_unset=True, exclude={"project_id", "client_key"})
                 return update_task(db, actor, existing.id, TaskUpdate(**fields))
         raise Conflict("Task was created concurrently; retry the call") from exc
+    share_uploads(db, actor, t.project_id, t.description, t.notes)
     if deps:
         _set_dependencies(db, t, deps)
     log_event(db, actor, project_id=t.project_id, event_type="task_created",
@@ -235,7 +243,7 @@ def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
 
 def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Task:
     actor.require_write()
-    t = get_or_404(db, Task, task_id, "Task")
+    t = project_resource(db, actor, Task, task_id, "Task")
     changes = {k: v for k, v in data.model_dump(exclude_unset=True).items() if getattr(t, k) != v}
     if changes.get("sort_order", 0) is None:
         del changes["sort_order"]
@@ -243,12 +251,20 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
         return t
     if "project_id" in changes:
         if changes["project_id"] is not None:
-            get_or_404(db, Project, changes["project_id"], "Project")
+            require_project(db, actor, changes["project_id"])
+        else:
+            changes["owner_id"] = actor.user_id
         if "milestone_id" not in changes:
             changes["milestone_id"] = None
         if "depends_on" not in changes and t.depends_on:
             changes["depends_on"] = []  # prerequisites live in the old project
+    if "project_id" in changes and t.client_key and db.scalar(select(Task.id).where(
+        Task.id != t.id, Task.project_id == changes["project_id"], Task.client_key == t.client_key,
+        Task.owner_id == changes.get("owner_id", t.owner_id) if changes["project_id"] is None else True,
+    )) is not None:
+        raise Conflict("A task with this client key already exists in the destination")
     validate_milestone_belongs(db, changes.get("project_id", t.project_id), changes.get("milestone_id"))
+    share_uploads(db, actor, changes.get("project_id", t.project_id), changes.get("description", t.description) or "", changes.get("notes", t.notes) or "")
     _check_dates(changes.get("start_date", t.start_date), changes.get("due_date", t.due_date))
     old_status = t.status
     new_deps = changes.pop("depends_on", None)
@@ -265,7 +281,7 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
         changes["depends_on"] = new_deps
     if "sort_order" in changes:
         db.flush()
-        _renumber_if_crowded(db, t)
+        _renumber_if_crowded(db, actor, t)
     _status_side_effects(db, actor, t, old_status)
     others = sorted(set(changes) - {"status", "sort_order"})  # reordering is not worth an event
     if others:
@@ -283,16 +299,17 @@ def upsert_task(
     project_id=None means "not given" for an id update and "no project" otherwise.
     Only explicitly provided fields are changed. Returns (task, created)."""
     actor.require_write()
+    if project_id is not None:
+        require_project(db, actor, project_id)
     if task_id is not None:
-        t = db.get(Task, task_id)
-        if t is None:
-            raise NotFound(f"Task {task_id} not found")
+        t = project_resource(db, actor, Task, task_id, "Task")
         # project is optional when updating by id; if given it must match.
         if project_id is not None and t.project_id != project_id:
             raise ValidationFailed(f"Task {task_id} belongs to project {t.project_id}, not {project_id}")
         return update_task(db, actor, task_id, TaskUpdate(**fields)), False
     if client_key:
-        t = db.scalar(select(Task).where(Task.project_id == project_id, Task.client_key == client_key))
+        t = db.scalar(select(Task).where(Task.project_id == project_id, Task.client_key == client_key,
+                                         Task.owner_id == actor.user_id if project_id is None else True))
         if t is not None:
             return update_task(db, actor, t.id, TaskUpdate(**fields)), False
     if "title" not in fields:
@@ -302,7 +319,7 @@ def upsert_task(
 
 def delete_task(db: Session, actor: Actor, task_id: int) -> None:
     actor.require_write()
-    t = get_or_404(db, Task, task_id, "Task")
+    t = project_resource(db, actor, Task, task_id, "Task")
     log_event(db, actor, project_id=t.project_id, event_type="task_deleted",
               summary=f"Task deleted: {t.title}", resource_type="task", resource_id=t.id)
     db.delete(t)

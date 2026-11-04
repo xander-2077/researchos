@@ -1,5 +1,7 @@
 # ResearchOS
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 **A self-hosted, AI-native research portfolio dashboard.** Manage several papers, robot-learning
 experiments and research-software projects in one place — through a clean web UI, a REST API,
 and an MCP server that Claude Code and OpenAI Codex can use from inside your repositories.
@@ -34,6 +36,8 @@ docker compose up -d --build
 ```
 
 Open **http://127.0.0.1:8000** and sign in as `admin` with that password.
+Create users and share registration links from **Settings → User management**. Add collaborators
+from a project’s **Members** tab; regular users and their MCP tokens access only their own or joined projects.
 The service listens on localhost only. For private remote access from your laptop/phone, enable
 the bundled Tailscale sidecar (HTTPS inside your tailnet, no open ports):
 
@@ -61,6 +65,57 @@ Optional demo data (three fictional projects): `docker compose exec researchos p
 
 There is deliberately no “create admin in the browser” step, so a freshly started instance is
 never claimable by whoever reaches it first.
+
+### Store data in custom path (Optional)
+
+Set this once in the project's `.env`; subsequent `docker compose` commands read it automatically:
+
+```dotenv
+# example
+
+RESEARCHOS_HOST_DATA_DIR=/mnt/researchos-data
+```
+
+This mounts the host directory at `/data` inside the container. All users share
+`researchos.db` (accounts, password hashes, projects and permissions); `uploads/` holds images,
+and `.secret_key` holds the generated session signing key. Keep the container's
+`RESEARCHOS_DATA_DIR=/data`. Without `RESEARCHOS_HOST_DATA_DIR`, the existing `researchos-data`
+named volume remains the default (`RESEARCHOS_VOLUME` can change its name).
+
+For a **new installation**, create a directory writable by the container user (UID/GID 10001),
+set the variable above, then start:
+
+```bash
+sudo mkdir -p /mnt/researchos-data
+sudo chown 10001:10001 /mnt/researchos-data
+docker compose up -d --build researchos
+```
+
+For an **existing installation**, migrate the data **before changing `.env`**. From the project
+directory, with the old storage configuration still in effect:
+
+```bash
+scripts/backup.sh
+docker compose stop researchos
+sudo mkdir -p /mnt/researchos-data
+# Use an empty target directory. Copy all of /data, including images and hidden key files.
+sudo docker compose cp researchos:/data/. /mnt/researchos-data/
+sudo chown -R 10001:10001 /mnt/researchos-data
+# Now add RESEARCHOS_HOST_DATA_DIR=/mnt/researchos-data to .env.
+docker compose up -d --build researchos
+```
+
+Verify the running container's mount:
+
+```bash
+docker inspect "$(docker compose ps -q researchos)" \
+  --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}} -> {{.Destination}}{{end}}{{end}}'
+```
+
+The result should be `/mnt/researchos-data -> /data`. Switching to an empty directory does not
+move existing accounts or projects automatically. Keep the old volume until the migrated
+installation has been checked. Rebuilding the container preserves the mounted data.
+
 
 ## Using it
 
@@ -152,6 +207,30 @@ scripts/setup-dev.sh                                  # Python venv + npm ci
 RESEARCHOS_ADMIN_PASSWORD='dev-password-123' scripts/dev.sh
 # API http://127.0.0.1:8000 (reload) · UI http://127.0.0.1:5173 (Vite, proxies /api and /mcp)
 ```
+
+Run setup once; use `scripts/dev.sh` for daily development without rebuilding Docker.
+Frontend changes update through Vite; backend Python changes restart the API automatically.
+Open the UI at **http://127.0.0.1:5173** and sign in as `admin` with the password above
+(the password only initializes a new database). Local data defaults to `backend/data/`,
+separate from Docker storage. Press `Ctrl+C` to stop.
+
+If Docker already occupies port 8000, keep it running and start the local services in two
+terminals, using port 8001 for the backend:
+
+```bash
+# Terminal 1 (from the repository root)
+cd backend
+RESEARCHOS_ADMIN_PASSWORD='dev-password-123' \
+  .venv/bin/uvicorn app.main:create_app --factory --reload --host 127.0.0.1 --port 8001
+```
+
+```bash
+# Terminal 2 (from the repository root)
+cd frontend
+RESEARCHOS_BACKEND=http://127.0.0.1:8001 npm run dev
+```
+
+The UI still runs at **http://127.0.0.1:5173**; its API requests go to the local backend.
 
 Tests:
 

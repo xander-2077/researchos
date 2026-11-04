@@ -185,6 +185,7 @@ def dashboard_deadlines(
 
 @router.get("/dashboard/activity", response_model=Page[EventOut], tags=["dashboard"])
 def dashboard_activity(
+    deleted: bool = False,
     project_id: int | None = Query(None, ge=0, description=PROJECT_ID_DOC),
     source: str | None = None,
     event_type: str | None = None,
@@ -198,9 +199,19 @@ def dashboard_activity(
 ):
     rows, total, lim, off = act_svc.list_events(
         db, actor, project_id=project_id, source=source, event_type=event_type, since=since, until=until, q=q,
-        limit=limit, offset=offset,
+        limit=limit, offset=offset, deleted=deleted,
     )
     return {"items": [act_svc.event_to_dict(e) for e in rows], "total": total, "limit": lim, "offset": off}
+
+
+@router.delete("/dashboard/activity/{event_id}", status_code=204, tags=["dashboard"])
+def delete_activity(event_id: int, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
+    act_svc.set_deleted(db, actor, event_id, deleted=True)
+
+
+@router.post("/dashboard/activity/{event_id}/restore", status_code=204, tags=["dashboard"])
+def restore_activity(event_id: int, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
+    act_svc.set_deleted(db, actor, event_id, deleted=False)
 
 
 @router.get("/dashboard/needs-review", response_model=list[ExperimentOut], tags=["dashboard"])

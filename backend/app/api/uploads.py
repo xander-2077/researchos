@@ -14,11 +14,14 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_actor
 from app.auth.actor import Actor
 from app.core.errors import NotFound, ValidationFailed
 from app.services.uploads import FILE_RE
+from app.database.session import get_db
+from app.services import uploads as svc
 
 router = APIRouter(tags=["uploads"])
 
@@ -46,7 +49,7 @@ def _detect(body: bytes) -> str | None:
 
 
 @router.post("/uploads", status_code=201)
-async def upload_image(request: Request, actor: Actor = Depends(get_actor)):
+async def upload_image(request: Request, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
     actor.require_write()
     body = await request.body()
     if not body:
@@ -62,17 +65,19 @@ async def upload_image(request: Request, actor: Actor = Depends(get_actor)):
         tmp.replace(path)
     else:
         path.touch()  # re-uploaded: restart the pruning grace period (it may be in an unsaved form)
+    svc.record_upload(db, actor, name)
     return {"url": f"/api/v1/uploads/{name}", "name": name, "size": len(body), "content_type": FORMATS[ext][0]}
 
 
 @router.get("/uploads/{name}")
-def get_image(name: str, request: Request, actor: Actor = Depends(get_actor)):
+def get_image(name: str, request: Request, actor: Actor = Depends(get_actor), db: Session = Depends(get_db)):
     actor.require_read()
     if not NAME_RE.match(name):
         raise NotFound("Upload not found")
     path = _upload_dir(request) / name
     if not path.is_file():
         raise NotFound("Upload not found")
+    svc.require_upload(db, actor, name)
     return FileResponse(
         path, media_type=FORMATS[name.rsplit(".", 1)[1]][0],
         headers={"Cache-Control": "private, max-age=31536000, immutable"},

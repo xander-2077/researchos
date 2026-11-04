@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import type { ReactNode } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -7,6 +7,7 @@ import { ErrorState, Spinner } from "@/components/ui/misc";
 import { AppStateProvider, useAppState } from "@/hooks/app-state";
 import { AuthProvider, useAuth } from "@/hooks/auth";
 import LoginPage from "@/pages/Login";
+import RegisterPage from "@/pages/Register";
 import { lazy } from "react";
 
 // Route-level code splitting: each page is its own chunk.
@@ -44,13 +45,14 @@ function NotFound() {
 }
 
 function Gate() {
+  const location = useLocation();
   const { me, loading, error } = useAuth();
   const { theme } = useAppState();
   if (loading) return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>;
   if (error && !me) return <ErrorState error={error} onRetry={() => window.location.reload()} className="min-h-screen" />;
   return (
     <>
-      {!me?.authenticated ? (
+      {location.pathname === "/register" ? <RegisterPage /> : !me?.authenticated ? (
         <LoginPage setupRequired={me?.setup_required} />
       ) : (
         <Routes>

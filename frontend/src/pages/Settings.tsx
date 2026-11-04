@@ -12,6 +12,8 @@ import { formatDateTime, relativeTime } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import type { ApiToken } from "@/types/api";
 import { LANGS, t, useI18n } from "@/i18n";
+import { useAuth } from "@/hooks/auth";
+import { UserManagement } from "@/features/user-management";
 
 function CopyButton({ text }: { text: string }) {
   const [done, setDone] = useState(false);
@@ -173,9 +175,11 @@ function LanguageSwitch() {
 }
 
 export default function SettingsPage() {
+  const { me } = useAuth();
   const { theme, setTheme } = useAppState();
   return (
     <div className="max-w-5xl space-y-4">
+      {me?.is_admin && <UserManagement />}
       <Tokens />
       <McpSetup />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

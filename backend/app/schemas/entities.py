@@ -47,6 +47,54 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class UserCreate(Strict):
+    username: str = Field(min_length=1, max_length=64)
+    is_admin: bool = False
+
+
+class UserUpdate(Strict):
+    is_admin: bool = False
+    is_active: bool = True
+
+
+class UserOut(ORMModel):
+    id: int
+    username: str
+    is_admin: bool
+    is_active: bool
+    registered: bool
+    created_at: datetime
+    last_login_at: datetime | None
+
+
+class InvitationCreated(Strict):
+    user: UserOut
+    invitation_path: str
+    expires_at: datetime
+
+
+class InvitationInspect(BaseModel):
+    token: str = Field(min_length=1, max_length=200)
+
+
+class RegisterRequest(InvitationInspect):
+    password: str = Field(min_length=10, max_length=1024)
+
+
+class MemberCreate(Strict):
+    username: str = Field(min_length=1, max_length=64)
+
+
+class MemberCandidate(Strict):
+    user_id: int
+    username: str
+
+
+class MemberOut(MemberCandidate):
+    is_active: bool
+    is_owner: bool
+
+
 # ---------------------------------------------------------------- Project
 class ProjectBase(Strict):
     title: str = Field(min_length=1, max_length=200)
@@ -143,6 +191,7 @@ class MilestoneProgress(BaseModel):
 
 
 class ProjectOut(ORMModel):
+    owner_id: int | None = None
     id: int
     slug: str
     title: str
@@ -419,6 +468,7 @@ class ProgressCreate(Strict):
 
 class EventOut(ORMModel):
     id: int
+    deleted_at: datetime | None = None
     project_id: int | None
     related_resource_type: str
     related_resource_id: int | None

@@ -62,7 +62,7 @@ def test_standalone_idempotency_has_its_own_scope_and_database_constraint(ctx):
     create(ctx)
     create(ctx)
     with SessionLocal() as db:
-        db.add(Task(project_id=None, client_key='daily', title='Duplicate'))
+        db.add(Task(project_id=None, owner_id=1, client_key='daily', title='Duplicate'))
         with pytest.raises(IntegrityError):
             db.commit()
 
@@ -88,12 +88,13 @@ def test_migration_preserves_existing_tasks_dependencies_and_events(ctx, setting
     tables = ['tasks', 'task_dependencies', 'progress_events', 'projects']
     with sqlite3.connect(path) as db:
         before = {table: db.execute(f'SELECT * FROM {table}').fetchall() for table in tables}
-    command.upgrade(cfg, 'head')
+    command.upgrade(cfg, '0005')
     with sqlite3.connect(path) as db:
         after = {table: db.execute(f'SELECT * FROM {table}').fetchall() for table in tables}
         assert after == before
         assert db.execute('PRAGMA foreign_key_check').fetchall() == []
         assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
+    command.upgrade(cfg, 'head')
     create(ctx, project_id=None)
     with pytest.raises(RuntimeError, match='Assign standalone tasks'):
         command.downgrade(cfg, '0004')
@@ -119,7 +120,7 @@ def test_concurrent_create_with_same_client_key_updates_instead_of_500(ctx, monk
         return real_scalar(self, stmt, *a, **kw)
 
     monkeypatch.setattr(svc.Session, "scalar", scalar_missing_first_lookup)
-    actor = Actor(kind="user", name="admin", source="manual")
+    actor = Actor(kind="user", name="admin", source="manual", user_id=1, is_admin=True)
     with SessionLocal() as db:
         t = svc.create_task(db, actor, TaskCreate(project_id=pid, client_key="race", title="Retry", priority="high"))
         assert t.id == winner["id"] and t.title == "Retry" and t.priority == "high"

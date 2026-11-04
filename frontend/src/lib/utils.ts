@@ -26,6 +26,7 @@ export const LABELS: Record<string, string> = {
   // deadline kinds
   milestone: "Milestone", task: "Task", archived: "Archived",
   // activity event types
+  member_added: "Member added", member_removed: "Member removed", member_left: "Member left",
   progress_note: "Progress note", project_created: "Project created", stage_changed: "Stage changed",
   health_changed: "Health changed", project_updated: "Project updated", project_archived: "Project archived",
   project_restored: "Project restored", task_created: "Task created", task_completed: "Task completed",

@@ -25,6 +25,13 @@ export const useDeadlines = (q: Q = {}, enabled = true) =>
   useQuery({ queryKey: ["deadlines", q], queryFn: () => api.deadlines(q), placeholderData: keepPreviousData, enabled });
 export const useNeedsReview = () => useQuery({ queryKey: ["needsReview"], queryFn: () => api.needsReview(8) });
 export const useTokens = () => useQuery({ queryKey: ["tokens"], queryFn: api.tokens });
+export const useUsers = (offset: number) => useQuery({ queryKey: ["users", offset], queryFn: () => api.users(offset) });
+export const useMembers = (projectId: number, offset: number) =>
+  useQuery({ queryKey: ["members", projectId, offset], queryFn: () => api.members(projectId, offset) });
+export const useMemberCandidates = (projectId: number, enabled: boolean) =>
+  useQuery({ queryKey: ["memberCandidates", projectId], queryFn: ({ signal }) => api.memberCandidates(projectId, signal), enabled });
+export const useInvitation = (token: string) =>
+  useQuery({ queryKey: ["invitation", token], queryFn: () => api.inspectInvitation(token), enabled: !!token, retry: false, refetchInterval: false });
 
 /** Mutation that toasts and refreshes all research data on success. */
 export function useWrite<TVars, TRes>(

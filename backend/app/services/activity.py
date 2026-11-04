@@ -1,4 +1,4 @@
-"""Append-only activity log. Called by every mutating service inside its transaction."""
+"""Activity logging and reversible cleanup by administrators."""
 
 from __future__ import annotations
 
@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth.actor import Actor
 from app.core.enums import SOURCES
 from app.core.errors import ValidationFailed
-from app.models import ProgressEvent, Project
+from app.models import ProgressEvent, ProjectMember, utcnow
 from app.repositories.base import apply_sort, by_project, get_or_404, paginate
 from app.schemas.entities import ProgressCreate
+from app.services.access import event_filter, require_admin, require_project
 
 RESOURCE_TYPES = {"", "project", "task", "milestone", "experiment", "run"}
 
@@ -30,6 +31,7 @@ def log_event(
 ) -> ProgressEvent:
     ev = ProgressEvent(
         project_id=project_id,
+        user_id=actor.user_id,
         event_type=event_type,
         summary=summary[:1000],
         details=details,
@@ -45,7 +47,7 @@ def log_event(
 def add_progress(db: Session, actor: Actor, project_id: int, data: ProgressCreate) -> ProgressEvent:
     """Append a progress note (never overwrites history)."""
     actor.require_write()
-    project = get_or_404(db, Project, project_id, "Project")
+    project = require_project(db, actor, project_id)
     rtype = data.related_resource_type or ""
     if rtype not in RESOURCE_TYPES:
         raise ValidationFailed(
@@ -56,6 +58,9 @@ def add_progress(db: Session, actor: Actor, project_id: int, data: ProgressCreat
     event_type = data.event_type or "progress_note"
     if not event_type.replace("_", "").isalnum():
         raise ValidationFailed("event_type must be snake_case")
+    from app.services.uploads import share_uploads
+
+    share_uploads(db, actor, project.id, data.details)
     ev = log_event(
         db,
         actor.with_source(data.source),
@@ -84,9 +89,23 @@ def list_events(
     sort: str | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    deleted: bool = False,
 ):
     actor.require_read()
-    stmt = select(ProgressEvent).options(joinedload(ProgressEvent.project))
+    if deleted:
+        require_admin(actor)
+    stmt = select(ProgressEvent).where(
+        event_filter(actor),
+        ProgressEvent.deleted_at.is_not(None) if deleted else ProgressEvent.deleted_at.is_(None),
+        ProgressEvent.event_type.not_in({"user_invited", "user_registered", "user_updated", "user_deleted", "activity_deleted", "activity_restored"}),
+    ).options(joinedload(ProgressEvent.project))
+    if actor.user_id is not None:
+        # The personal feed follows participation even for administrators.
+        stmt = stmt.where(
+            ProgressEvent.project_id.in_(select(ProjectMember.project_id).where(ProjectMember.user_id == actor.user_id))
+            | (ProgressEvent.project_id.is_(None) & (ProgressEvent.related_resource_type == "task")
+               & (ProgressEvent.user_id == actor.user_id))
+        )
     if project_id is not None:
         stmt = stmt.where(by_project(ProgressEvent.project_id, project_id))
     if source:
@@ -108,6 +127,20 @@ def list_events(
     return paginate(db, stmt, limit, offset)
 
 
+def set_deleted(db: Session, actor: Actor, event_id: int, *, deleted: bool) -> None:
+    require_admin(actor)
+    ev = get_or_404(db, ProgressEvent, event_id, "Activity")
+    if (ev.deleted_at is not None) == deleted:
+        return
+    ev.deleted_at = utcnow() if deleted else None
+    log_event(
+        db, actor, project_id=ev.project_id,
+        event_type="activity_deleted" if deleted else "activity_restored",
+        summary=f"Activity {'deleted' if deleted else 'restored'}: {ev.id}",
+    )
+    db.commit()
+
+
 def event_to_dict(ev: ProgressEvent) -> dict:
     return {
         "id": ev.id,
@@ -120,6 +153,7 @@ def event_to_dict(ev: ProgressEvent) -> dict:
         "source": ev.source,
         "actor": ev.actor,
         "created_at": ev.created_at,
+        "deleted_at": ev.deleted_at,
         "project_slug": ev.project.slug if ev.project else None,
         "project_title": ev.project.title if ev.project else None,
     }

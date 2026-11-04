@@ -8,6 +8,7 @@ interface AuthState {
   loading: boolean;
   error: unknown;
   login: (u: string, p: string) => Promise<void>;
+  register: (token: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -22,18 +23,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [q.data]);
 
   useEffect(() => {
-    setUnauthorizedHandler(() => qc.setQueryData<Me>(["me"], { authenticated: false }));
+    setUnauthorizedHandler(() => {
+      setCsrfToken(null);
+      void qc.cancelQueries();
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+      qc.setQueryData<Me>(["me"], { authenticated: false });
+    });
     return () => setUnauthorizedHandler(null);
   }, [qc]);
 
   const login = useCallback(
     async (u: string, p: string) => {
       const r = await api.login(u, p);
+      await qc.cancelQueries();
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
       setCsrfToken(r.csrf_token);
-      qc.setQueryData<Me>(["me"], { authenticated: true, username: r.username, csrf_token: r.csrf_token });
+      qc.setQueryData<Me>(["me"], { ...r, authenticated: true });
     },
     [qc],
   );
+  const register = useCallback(async (token: string, password: string) => {
+    const r = await api.register(token, password);
+    await qc.cancelQueries();
+    qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+    setCsrfToken(r.csrf_token);
+    qc.setQueryData<Me>(["me"], { ...r, authenticated: true });
+  }, [qc]);
   const logout = useCallback(async () => {
     await api.logout().catch(() => undefined);
     setCsrfToken(null);
@@ -45,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     qc.setQueryData<Me>(["me"], { authenticated: false });
   }, [qc]);
 
-  const value = useMemo(() => ({ me: q.data, loading: q.isLoading, error: q.error, login, logout }), [q.data, q.isLoading, q.error, login, logout]);
+  const value = useMemo(() => ({ me: q.data, loading: q.isLoading, error: q.error, login, register, logout }), [q.data, q.isLoading, q.error, login, register, logout]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

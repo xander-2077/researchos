@@ -6,6 +6,7 @@ type Json = Record<string, unknown>;
 
 export interface FakeState {
   authenticated: boolean;
+  isAdmin: boolean;
   projects: Json[];
   tasks: Json[];
   experiments: Json[];
@@ -32,7 +33,7 @@ export function makeProject(over: Json = {}): Json {
 const page = (items: Json[]) => ({ items, total: items.length, limit: 50, offset: 0 });
 
 export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
-  const state: FakeState = { authenticated: true, projects: [], tasks: [], experiments: [], milestones: [], calls: [], ...init };
+  const state: FakeState = { authenticated: true, isAdmin: true, projects: [], tasks: [], experiments: [], milestones: [], calls: [], ...init };
   const json = (data: unknown, status = 200) =>
     Promise.resolve(new Response(status === 204 ? null : JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } }));
 
@@ -45,7 +46,7 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     const q = url.searchParams;
     let m: RegExpMatchArray | null;
 
-    if (path === "/auth/me") return json(state.authenticated ? { authenticated: true, username: "admin", csrf_token: "csrf-1" } : { authenticated: false, setup_required: false });
+    if (path === "/auth/me") return json(state.authenticated ? { authenticated: true, username: "admin", user_id: 1, is_admin: state.isAdmin, csrf_token: "csrf-1" } : { authenticated: false, setup_required: false });
     if (path === "/auth/logout" && method === "POST") {
       state.authenticated = false;
       return json({ ok: true });
@@ -53,7 +54,7 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
     if (path === "/auth/login" && method === "POST") {
       if (body?.password !== "correct-horse-1") return json({ error: { code: "unauthorized", message: "Invalid username or password" } }, 401);
       state.authenticated = true;
-      return json({ username: "admin", csrf_token: "csrf-2" });
+      return json({ username: "admin", user_id: 1, is_admin: state.isAdmin, csrf_token: "csrf-2" });
     }
     if (!state.authenticated) return json({ error: { code: "unauthorized", message: "Not authenticated" } }, 401);
 

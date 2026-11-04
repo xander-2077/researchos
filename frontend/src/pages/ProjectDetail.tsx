@@ -1,8 +1,9 @@
+import { ProjectMembers } from "@/features/user-management";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Activity, AlertOctagon, Archive, ArchiveRestore, ArrowLeft, CalendarClock, ChartGantt, CheckCircle2, Columns3, ExternalLink, Flag,
-  FlaskConical, GitBranch, LayoutList, ListTodo, MoreHorizontal, NotebookPen, Pencil, Plus, StickyNote, Target, Trash2,
+  FlaskConical, GitBranch, LayoutList, ListTodo, MoreHorizontal, NotebookPen, Pencil, Plus, StickyNote, Target, Trash2, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
@@ -18,13 +19,14 @@ import { IconPicker } from "@/components/icons/project-icons";
 import { ExperimentRegistry } from "@/features/experiments";
 import { MilestoneFormDialog, ProjectFormDialog } from "@/features/forms";
 import { useAppState } from "@/hooks/app-state";
+import { useAuth } from "@/hooks/auth";
 import { useMilestones, useProgressList, useProject, useAllTasks, useProgressPages, useWrite } from "@/hooks/queries";
 import { api, type ProjectInput } from "@/services/api";
 import { cn, formatDate, formatDateTime, label, relativeTime } from "@/lib/utils";
 import { t } from "@/i18n";
 import { HEALTHS, MILESTONE_STATUSES, PRIORITIES, SOURCES, STAGES, TASK_STATUSES, type Milestone, type Project } from "@/types/api";
 
-const TABS = ["overview", "milestones", "tasks", "gantt", "experiments", "activity", "notes"] as const;
+const TABS = ["overview", "milestones", "tasks", "gantt", "experiments", "activity", "notes", "members"] as const;
 
 function ProjectIconEditor({ project }: { project: Project }) {
   const m = useWrite((v: { icon: string; color: string }) => api.updateProject(project.id, { ...v, version: project.version }), { success: "Icon updated" });
@@ -235,18 +237,27 @@ function NotesTab({ p }: { p: Project }) {
 }
 
 export default function ProjectDetailPage() {
+  const { me } = useAuth();
   const { ref } = useParams();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const { openCreate } = useAppState();
+  const { openCreate, projectFilter, setProjectFilter } = useAppState();
   const q = useProject(ref);
   const [edit, setEdit] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const tab = (TABS as readonly string[]).includes(params.get("tab") ?? "") ? params.get("tab")! : "overview";
   const archive = useWrite(
     (archived: boolean) => (archived ? api.archiveProject(q.data!.id) : api.updateProject(q.data!.id, { archived: false })),
     { success: (_r, a) => (a ? "Project archived" : "Project restored"), onSuccess: () => setArchiveConfirm(false) },
   );
+  const remove = useWrite((id: number) => api.deleteProject(id), {
+    success: "Project deleted",
+    onSuccess: (_, id) => {
+      if (projectFilter === id) setProjectFilter(null);
+      navigate("/projects");
+    },
+  });
 
   if (q.isLoading) return <div className="space-y-3"><Skeleton className="h-8 w-72" /><Skeleton className="h-6 w-96" /><Skeleton className="h-72" /></div>;
   if (q.isError || !q.data) return <Card><ErrorState error={q.error} onRetry={() => q.refetch()} /></Card>;
@@ -276,6 +287,7 @@ export default function ProjectDetailPage() {
             <Button variant="ghost" size="icon" aria-label={p.archived ? "Restore project" : "Archive project"} title={p.archived ? t("Restore") : t("Archive")} onClick={() => (p.archived ? archive.mutate(false) : setArchiveConfirm(true))}>
               {p.archived ? <ArchiveRestore /> : <Archive />}
             </Button>
+            {me?.user_id === p.owner_id && <Button variant="ghost" size="icon" className="text-danger" aria-label={t("Delete project")} title={t("Delete project")} onClick={() => setDeleteConfirm(true)}><Trash2 /></Button>}
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -295,6 +307,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="experiments"><FlaskConical /> {t("Experiments")} <span className="text-xs text-muted-foreground">{p.experiment_count || ""}</span></TabsTrigger>
           <TabsTrigger value="activity"><Activity /> {t("Activity")}</TabsTrigger>
           <TabsTrigger value="notes"><StickyNote /> {t("Notes")}</TabsTrigger>
+          <TabsTrigger value="members"><Users /> {t("Members")}</TabsTrigger>
         </TabsList>
         <TabsContent value="overview"><OverviewTab p={p} /></TabsContent>
         <TabsContent value="milestones"><MilestonesTab p={p} /></TabsContent>
@@ -303,11 +316,14 @@ export default function ProjectDetailPage() {
         <TabsContent value="experiments"><ExperimentRegistry projectId={p.id} includeArchived={p.archived} /></TabsContent>
         <TabsContent value="activity"><ActivityTab p={p} /></TabsContent>
         <TabsContent value="notes"><NotesTab p={p} /></TabsContent>
+        <TabsContent value="members"><ProjectMembers project={p} /></TabsContent>
       </Tabs>
 
       <ProjectFormDialog open={edit} onOpenChange={setEdit} project={p} onSaved={(np) => np.slug !== ref && navigate(`/projects/${np.slug}`, { replace: true })} />
       <ConfirmDialog open={archiveConfirm} onOpenChange={setArchiveConfirm} title="Archive project?" confirmLabel="Archive" onConfirm={() => archive.mutate(true)} busy={archive.isPending}
         description="The project is hidden from the portfolio but nothing is deleted. You can restore it from Projects → Archived." />
+      <ConfirmDialog open={deleteConfirm} onOpenChange={setDeleteConfirm} title="Delete project?" destructive confirmLabel="Delete project" onConfirm={() => remove.mutate(p.id)} busy={remove.isPending}
+        description={t("Permanently delete {name}? Its tasks, milestones, experiments, runs and activity will be deleted for all members. This cannot be undone.", { name: p.title })} />
     </div>
   );
 }
