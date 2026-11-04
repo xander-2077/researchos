@@ -184,4 +184,4 @@ port 8000 directly to the internet.
 
 ## License
 
-MIT (add a `LICENSE` file if you publish the repository).
+[MIT](LICENSE)
