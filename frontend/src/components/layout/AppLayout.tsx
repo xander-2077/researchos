@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/form";
 import { DropdownContent, DropdownItem, DropdownLabel, DropdownMenu, DropdownSeparator, DropdownTrigger } from "@/components/ui/overlay";
 import { Kbd, Spinner } from "@/components/ui/misc";
 import { ProjectIcon } from "@/components/icons/project-icons";
-import { useAppState, type Theme } from "@/hooks/app-state";
+import { NO_PROJECT, useAppState, type Theme } from "@/hooks/app-state";
 import { useAuth } from "@/hooks/auth";
 import { useProjects } from "@/hooks/queries";
 import { api } from "@/services/api";
@@ -245,13 +245,14 @@ function ProjectFilter() {
       placeholder="All projects"
     >
       {data?.items.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+      <option value={NO_PROJECT}>{t("No project")}</option>
     </Select>
   );
 }
 
 function NewMenu() {
   const { openCreate, projectFilter } = useAppState();
-  const pid = projectFilter ?? undefined;
+  const pid = projectFilter || undefined; // NO_PROJECT (0) → create without a preset project
   return (
     <DropdownMenu>
       <DropdownTrigger asChild>

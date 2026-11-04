@@ -10,6 +10,7 @@ Commands:
   backup [PATH]                Consistent online backup via the SQLite backup API
   restore PATH [--yes]         Restore a backup (stop the server first)
   export [PATH]                JSON export of all research data
+  prune-uploads [--days N] [--dry-run]   Delete images no note references (the server also does this daily)
   seed-demo                    Insert demo projects (only into an empty database)
 """
 
@@ -244,6 +245,19 @@ def cmd_export(a: argparse.Namespace) -> None:
         print(text)
 
 
+def cmd_prune_uploads(a: argparse.Namespace) -> None:
+    from datetime import timedelta
+
+    from app.services.uploads import prune_uploads
+
+    _setup()
+    with SessionLocal() as db:
+        names = prune_uploads(db, get_settings().data_dir / "uploads", timedelta(days=a.days), dry_run=a.dry_run)
+    for n in names:
+        print(n)
+    print(f"{'Would remove' if a.dry_run else 'Removed'} {len(names)} unused upload(s)")
+
+
 def cmd_seed_demo(_: argparse.Namespace) -> None:
     from app.seed import seed_demo
 
@@ -284,6 +298,10 @@ def main(argv: list[str] | None = None) -> None:
     sp = sub.add_parser("export")
     sp.add_argument("path", nargs="?")
     sp.set_defaults(fn=cmd_export)
+    sp = sub.add_parser("prune-uploads", help="delete uploaded images that nothing references")
+    sp.add_argument("--days", type=float, default=7, help="only files older than this (default 7)")
+    sp.add_argument("--dry-run", action="store_true")
+    sp.set_defaults(fn=cmd_prune_uploads)
     sub.add_parser("seed-demo").set_defaults(fn=cmd_seed_demo)
     args = p.parse_args(argv)
     args.fn(args)

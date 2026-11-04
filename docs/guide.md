@@ -14,7 +14,7 @@ experiments in the browser, and let Claude Code or Codex read and update them ov
 | **Stage** | Ideation → Research Design → Implementation → Experimentation → Analysis → Writing → Submission → Revision → Completed (or On Hold). |
 | **Health** | On Track / At Risk / Blocked. “Blocked Projects” on the overview counts *Blocked*. |
 | **Milestone** | A checkpoint with a clear completion criterion. Progress = completed / non-cancelled milestones; without milestones the UI shows “Not set” rather than a made-up percentage. |
-| **Task** | A concrete to-do; project is optional (choose **No project**), and can be assigned later. Optional milestone, priority, deadline, tags, git reference. |
+| **Task** | A concrete to-do; project is optional (choose **No project**), and can be assigned later. The project filter in the header also has **No project**. Optional milestone, priority, deadline, tags, git reference. |
 | **Experiment** | One condition (e.g. “Ablation: no world model”). Use **Group** to keep an ablation study together. |
 | **Run** | One execution of an experiment (seed/config): commit, config, metrics, artifact links, verification status. |
 | **Activity** | Append-only research log: progress notes plus every important change, with its source (Manual, Claude Code, Codex, REST API, System). |
@@ -54,7 +54,8 @@ experiments in the browser, and let Claude Code or Codex read and update them ov
    and cannot change verified results without explicit confirmation.
 5. **Description**, **Conclusion** and project **Notes** are Markdown and take images (plots, screenshots):
    click **Insert image**, paste, or drop a PNG/JPEG/GIF/WebP (≤ 10 MB). Images are stored in the data
-   volume under `uploads/`; `scripts/backup.sh` mirrors them to `backups/uploads/`.
+   volume under `uploads/`; `scripts/backup.sh` mirrors them to `backups/uploads/`. Images no note
+   references any more are deleted after 7 days (daily, or now with `python -m app.cli prune-uploads`).
 6. Don't upload checkpoints, videos or raw logs — store paths/URLs.
 
 ## 4. Connect Claude Code / Codex

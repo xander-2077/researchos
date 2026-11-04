@@ -114,7 +114,7 @@ export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectI
         </Select>
         <div className="ml-auto flex items-center gap-2">
           <Segmented ariaLabel="Grouping" value={grouped} onChange={setGrouped} options={[{ value: "group", label: t("By group") }, { value: "flat", label: t("Flat") }]} />
-          <Button onClick={() => openCreate({ kind: "experiment", projectId: projectId ?? undefined })}><Plus /> {t("Experiment")}</Button>
+          <Button onClick={() => openCreate({ kind: "experiment", projectId: projectId || undefined })}><Plus /> {t("Experiment")}</Button>
         </div>
       </div>
       {query.isLoading ? (
@@ -124,7 +124,7 @@ export function ExperimentRegistry({ projectId, initialStatus = "" }: { projectI
       ) : !items.length ? (
         <Card>
           <EmptyState icon={<FlaskConical className="size-4" />} title="No experiments" description="Experiments group runs (seeds, configs) under one condition. Agents can record them via MCP record_experiment."
-            action={<Button variant="secondary" onClick={() => openCreate({ kind: "experiment", projectId: projectId ?? undefined })}><Plus /> {t("New experiment")}</Button>} />
+            action={<Button variant="secondary" onClick={() => openCreate({ kind: "experiment", projectId: projectId || undefined })}><Plus /> {t("New experiment")}</Button>} />
         </Card>
       ) : grouped === "flat" ? (
         <Card><ExperimentGroupTable items={items} metricCols={metricColsFor(items)} showProject={!projectId} /></Card>

@@ -11,7 +11,7 @@ from app.auth.actor import Actor
 from app.core.enums import SOURCES
 from app.core.errors import ValidationFailed
 from app.models import ProgressEvent, Project
-from app.repositories.base import apply_sort, get_or_404, paginate
+from app.repositories.base import apply_sort, by_project, get_or_404, paginate
 from app.schemas.entities import ProgressCreate
 
 RESOURCE_TYPES = {"", "project", "task", "milestone", "experiment", "run"}
@@ -88,7 +88,7 @@ def list_events(
     actor.require_read()
     stmt = select(ProgressEvent).options(joinedload(ProgressEvent.project))
     if project_id is not None:
-        stmt = stmt.where(ProgressEvent.project_id == project_id)
+        stmt = stmt.where(by_project(ProgressEvent.project_id, project_id))
     if source:
         sources = [s for s in source.split(",") if s]
         bad = set(sources) - set(SOURCES)

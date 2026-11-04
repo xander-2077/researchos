@@ -51,7 +51,7 @@ export function GanttChart({ projectId }: { projectId: number | null }) {
   const px = PX_PER_DAY[zoom];
   const today = todayISO();
 
-  const tasksQ = useTasks({ limit: 500, sort: "due_date", ...(projectId ? { project_id: projectId } : {}) });
+  const tasksQ = useTasks({ limit: 500, sort: "due_date", ...(projectId != null ? { project_id: projectId } : {}) });
   const projectsQ = useProjects({ include_all: true, limit: 200 });
   const projectById = useMemo(() => new Map((projectsQ.data?.items ?? []).map((x) => [x.id, x])), [projectsQ.data]);
   const marksQ = useDeadlines({ days: 730, kinds: "milestone,submission", include_overdue: true, limit: 500, project_id: projectId ?? undefined });

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from sqlalchemy import String, case, cast, func, select
+from sqlalchemy import String, case, cast, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -11,7 +11,7 @@ from app.auth.actor import Actor
 from app.core.enums import OPEN_TASK_STATUSES, PRIORITIES, TASK_STATUSES
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.models import Project, Task, TaskDependency, utcnow
-from app.repositories.base import apply_sort, get_or_404, paginate
+from app.repositories.base import apply_sort, by_project, get_or_404, paginate
 from app.schemas.entities import TaskCreate, TaskUpdate
 from app.services.activity import log_event
 from app.services.projects import validate_milestone_belongs
@@ -54,7 +54,7 @@ def list_tasks(
     if not include_archived:
         stmt = stmt.where(Task.project_id.is_(None) | Project.archived.is_(False))
     if project_id is not None:
-        stmt = stmt.where(Task.project_id == project_id)
+        stmt = stmt.where(by_project(Task.project_id, project_id))
     if milestone_id is not None:
         stmt = stmt.where(Task.milestone_id == milestone_id)
     if (st := _check_enum("status", status, TASK_STATUSES)) is not None:
@@ -165,6 +165,29 @@ def _status_side_effects(db: Session, actor: Actor, t: Task, old: str | None) ->
                       summary=f"Task '{t.title}': {old} → {t.status}", resource_type="task", resource_id=t.id)
 
 
+ORDER_GAP = 1024.0
+MIN_ORDER_GAP = 1e-3  # ~20 drops into the same slot; floats would collide after ~50
+
+
+def _renumber_if_crowded(db: Session, t: Task) -> None:
+    """Kanban drops use the midpoint of the neighbours' sort_order, which halves the gap each
+    time. When the moved card gets too close to (or ties with) a neighbour, respace every task
+    to multiples of ORDER_GAP, keeping the global order. Not an edit: updated_at is untouched."""
+    others = select(Task.sort_order).where(Task.id != t.id)
+    below = db.scalar(others.where(Task.sort_order <= t.sort_order).order_by(Task.sort_order.desc()).limit(1))
+    above = db.scalar(others.where(Task.sort_order >= t.sort_order).order_by(Task.sort_order).limit(1))
+    gaps = [abs(t.sort_order - x) for x in (below, above) if x is not None]
+    if not gaps or min(gaps) >= MIN_ORDER_GAP:
+        return
+    ids = db.scalars(select(Task.id).order_by(Task.sort_order, Task.id)).all()
+    for pos, tid in enumerate(ids, start=1):
+        db.execute(
+            update(Task).where(Task.id == tid)
+            .values(sort_order=pos * ORDER_GAP, updated_at=Task.updated_at)
+            .execution_options(synchronize_session=False)
+        )
+
+
 def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
     actor.require_write()
     if data.project_id is not None:
@@ -181,7 +204,7 @@ def create_task(db: Session, actor: Actor, data: TaskCreate) -> Task:
     fields = data.model_dump()
     deps = fields.pop("depends_on")
     if fields.get("sort_order") is None:
-        fields["sort_order"] = (db.scalar(select(func.max(Task.sort_order))) or 0) + 1024
+        fields["sort_order"] = (db.scalar(select(func.max(Task.sort_order))) or 0) + ORDER_GAP
     t = Task(**fields)
     if t.status == "done":
         t.completed_at = utcnow()
@@ -240,6 +263,9 @@ def update_task(db: Session, actor: Actor, task_id: int, data: TaskUpdate) -> Ta
         _set_dependencies(db, t, new_deps)
     if new_deps is not None:
         changes["depends_on"] = new_deps
+    if "sort_order" in changes:
+        db.flush()
+        _renumber_if_crowded(db, t)
     _status_side_effects(db, actor, t, old_status)
     others = sorted(set(changes) - {"status", "sort_order"})  # reordering is not worth an event
     if others:

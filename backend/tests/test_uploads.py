@@ -66,3 +66,38 @@ def test_upload_size_limit_is_separate_from_json_limit(tmp_path: Path):
         assert r.status_code == 413
         r = c.post("/api/v1/projects", json={"title": "x" * 2000}, headers=csrf)
         assert r.status_code == 413
+
+
+def test_prune_removes_only_old_unreferenced_uploads(ctx: Ctx, settings):
+    import os
+    import time
+
+    from app.database.session import SessionLocal
+    from app.services.uploads import prune_uploads
+    from tests.test_api import mkproject
+
+    c = ctx.client
+    up = lambda data: c.post("/api/v1/uploads", content=data, headers={**ctx.csrf, "Content-Type": "image/png"}).json()  # noqa: E731
+    in_note, in_task, orphan, fresh = (up(b"\x89PNG\r\n\x1a\n" + bytes([i]) * 32) for i in range(4))
+    p = mkproject(ctx)
+    c.patch(f"/api/v1/projects/{p['id']}", json={"notes": f"curve\n\n![a]({in_note['url']})"}, headers=ctx.csrf)
+    c.post("/api/v1/tasks", json={"title": "t", "description": f"see ![b]({in_task['url']})"}, headers=ctx.rw)
+    d = settings.data_dir / "uploads"
+    (d / "abc.part").write_bytes(b"x")
+    old = time.time() - 8 * 86400
+    for name in (in_note["name"], in_task["name"], orphan["name"], "abc.part"):
+        os.utime(d / name, (old, old))
+
+    with SessionLocal() as db:
+        assert prune_uploads(db, d, dry_run=True) == sorted([orphan["name"], "abc.part"])
+        assert (d / orphan["name"]).exists()
+        assert prune_uploads(db, d) == sorted([orphan["name"], "abc.part"])
+    left = {f.name for f in d.iterdir()}
+    assert left == {in_note["name"], in_task["name"], fresh["name"]}  # fresh: still in its grace period
+
+    # re-uploading an old file restarts its grace period
+    os.utime(d / in_note["name"], (old, old))
+    c.patch(f"/api/v1/projects/{p['id']}", json={"notes": "no image any more"}, headers=ctx.csrf)
+    up(b"\x89PNG\r\n\x1a\n" + bytes([0]) * 32)
+    with SessionLocal() as db:
+        assert prune_uploads(db, d) == []

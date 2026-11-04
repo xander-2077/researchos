@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
@@ -89,6 +90,23 @@ def bootstrap_admin(settings: Settings) -> None:
         db.close()
 
 
+async def _prune_uploads_daily(settings: Settings) -> None:
+    """Remove images no note references any more: shortly after start, then once a day."""
+    from app.services.uploads import prune_uploads
+
+    def run() -> None:
+        with SessionLocal() as db:
+            prune_uploads(db, settings.data_dir / "uploads")
+
+    await asyncio.sleep(60)
+    while True:
+        try:
+            await asyncio.to_thread(run)
+        except Exception:  # pragma: no cover - housekeeping must never take the server down
+            logging.getLogger(__name__).exception("Pruning uploads failed")
+        await asyncio.sleep(24 * 3600)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     init_engine(settings.sqlalchemy_url)
@@ -110,8 +128,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        async with mcp.session_manager.run():
-            yield
+        housekeeping = asyncio.create_task(_prune_uploads_daily(settings))
+        try:
+            async with mcp.session_manager.run():
+                yield
+        finally:
+            housekeeping.cancel()
 
     app = FastAPI(
         title="ResearchOS API",

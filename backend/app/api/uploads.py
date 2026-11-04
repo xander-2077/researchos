@@ -9,7 +9,6 @@ deliberately not accepted (it can carry script).
 from __future__ import annotations
 
 import hashlib
-import re
 import uuid
 from collections.abc import Callable
 
@@ -19,6 +18,7 @@ from fastapi.responses import FileResponse
 from app.api.deps import get_actor
 from app.auth.actor import Actor
 from app.core.errors import NotFound, ValidationFailed
+from app.services.uploads import FILE_RE
 
 router = APIRouter(tags=["uploads"])
 
@@ -29,7 +29,7 @@ FORMATS: dict[str, tuple[str, Callable[[bytes], bool]]] = {
     "gif": ("image/gif", lambda b: b[:6] in (b"GIF87a", b"GIF89a")),
     "webp": ("image/webp", lambda b: b[:4] == b"RIFF" and b[8:12] == b"WEBP"),
 }
-NAME_RE = re.compile(r"^[0-9a-f]{32}\.(png|jpg|gif|webp)$")
+NAME_RE = FILE_RE  # content-addressed names only; unused files are pruned by app.services.uploads
 
 
 def _upload_dir(request: Request):
@@ -60,6 +60,8 @@ async def upload_image(request: Request, actor: Actor = Depends(get_actor)):
         tmp = path.with_suffix(f".{uuid.uuid4().hex}.part")  # unique: same image may arrive twice at once
         tmp.write_bytes(body)
         tmp.replace(path)
+    else:
+        path.touch()  # re-uploaded: restart the pruning grace period (it may be in an unsaved form)
     return {"url": f"/api/v1/uploads/{name}", "name": name, "size": len(body), "content_type": FORMATS[ext][0]}
 
 

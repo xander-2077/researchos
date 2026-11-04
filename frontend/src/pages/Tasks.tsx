@@ -87,7 +87,7 @@ export default function TasksPage() {
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <span className="text-xs text-muted-foreground tabular-nums">{t("{n} task(s)", { n: query.data?.total ?? 0 })}</span>
           <Segmented ariaLabel="Task view" value={view} onChange={setView} options={[{ value: "table", label: <><LayoutList /> {t("Table")}</> }, { value: "kanban", label: <><Columns3 /> {t("Kanban")}</> }]} />
-          <Button onClick={() => openCreate({ kind: "task", projectId: projectFilter ?? undefined })}><Plus /> {t("Task")}</Button>
+          <Button onClick={() => openCreate({ kind: "task", projectId: projectFilter || undefined })}><Plus /> {t("Task")}</Button>
         </div>
       </div>
       {query.isLoading ? (

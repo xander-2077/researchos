@@ -21,6 +21,14 @@ def get_or_404(db: Session, model: type[M], obj_id: int, label: str | None = Non
     return obj
 
 
+NO_PROJECT = 0  # project_id filter value meaning "items that belong to no project"
+
+
+def by_project(col: Any, project_id: int) -> Any:
+    """Filter clause for a ``project_id`` query parameter (``0`` = no project)."""
+    return col.is_(None) if project_id == NO_PROJECT else col == project_id
+
+
 def clamp_limit(limit: int | None) -> int:
     s = get_settings()
     if limit is None:

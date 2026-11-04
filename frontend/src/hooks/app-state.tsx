@@ -32,10 +32,13 @@ export interface CreateRequest {
   defaults?: Record<string, unknown>;
 }
 
+/** Project filter value for "tasks and events that belong to no project" (API: project_id=0). */
+export const NO_PROJECT = 0;
+
 interface AppState {
   theme: Theme;
   setTheme: (t: Theme) => void;
-  /** Global project filter used by Tasks / Experiments / Timeline / Activity (null = all). */
+  /** Global project filter used by Tasks / Experiments / Timeline / Activity (null = all, NO_PROJECT = none). */
   projectFilter: number | null;
   setProjectFilter: (id: number | null) => void;
   create: CreateRequest | null;
@@ -51,7 +54,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => (readStorage(THEME_KEY) as Theme) || "system");
   const [projectFilter, setProjectFilterState] = useState<number | null>(() => {
     const v = readStorage("researchos-project-filter");
-    return v ? Number(v) || null : null;
+    const n = v ? Number(v) : NaN;
+    return Number.isInteger(n) && n >= 0 ? n : null;
   });
   const [create, setCreate] = useState<CreateRequest | null>(null);
   const [sidebarCollapsed, setCollapsed] = useState(() => readStorage("researchos-sidebar") === "collapsed");
@@ -70,7 +74,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setThemeState(t);
   }, []);
   const setProjectFilter = useCallback((id: number | null) => {
-    writeStorage("researchos-project-filter", id ? String(id) : "");
+    writeStorage("researchos-project-filter", id === null ? "" : String(id));
     setProjectFilterState(id);
   }, []);
   const toggleSidebar = useCallback(() => {

@@ -93,7 +93,8 @@ export function installFakeApi(init: Partial<FakeState> = {}): FakeState {
 
     if (path === "/tasks" && method === "GET") {
       let items = state.tasks;
-      if (q.get("project_id")) items = items.filter((t) => t.project_id === Number(q.get("project_id")));
+      const pid = q.get("project_id");
+      if (pid) items = items.filter((t) => (pid === "0" ? t.project_id == null : t.project_id === Number(pid)));
       return json(page(items));
     }
     if (path === "/tasks" && method === "POST") {

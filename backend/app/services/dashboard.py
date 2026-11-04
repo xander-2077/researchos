@@ -12,7 +12,7 @@ from app.auth.actor import Actor
 from app.core.enums import OPEN_MILESTONE_STATUSES, OPEN_TASK_STATUSES, PRIORITY_RANK
 from app.core.errors import ValidationFailed
 from app.models import Experiment, Milestone, Project, Task
-from app.repositories.base import clamp_limit
+from app.repositories.base import by_project, clamp_limit
 from app.services import experiments as exp_svc
 from app.services import tasks as task_svc
 
@@ -109,7 +109,7 @@ def deadlines_between(
     if "task" in kinds:
         task_filter = [Task.project_id.is_(None) | Project.archived.is_(False)]
         if project_id is not None:
-            task_filter.append(Task.project_id == project_id)
+            task_filter.append(by_project(Task.project_id, project_id))
         for t in db.scalars(
             select(Task).outerjoin(Project).options(joinedload(Task.project))
             .where(*task_filter, Task.status.in_(OPEN_TASK_STATUSES), *in_range(Task.due_date))

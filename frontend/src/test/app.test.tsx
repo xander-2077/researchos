@@ -142,6 +142,23 @@ describe("create and edit", () => {
     expect(screen.getByRole("table").querySelector('a[href="/projects/null"]')).toBeNull();
   });
 
+  it("filters to tasks without a project from the header and creates new ones without a preset project", async () => {
+    const task = (id: number, title: string, p: Record<string, unknown> | null) => ({ id, title, status: "todo", priority: "medium", tags: [], depends_on: [], sort_order: id,
+      project_id: p?.id ?? null, project_slug: p?.slug ?? null, project_title: p?.title ?? null, milestone_id: null, milestone_title: null,
+      start_date: null, due_date: null, created_at: "", updated_at: "", completed_at: null });
+    const p = makeProject({ id: 3, title: "Quadruped Soccer" });
+    state = installFakeApi({ projects: [p], tasks: [task(1, "Loose end", null), task(2, "Tune gait", p)] });
+    renderApp("/tasks");
+    const user = userEvent.setup();
+    expect(await screen.findByText("Tune gait")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Project filter"), "No project");
+    await waitFor(() => expect(screen.queryByText("Tune gait")).toBeNull());
+    expect(screen.getByText("Loose end")).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Task" })[0]); // toolbar button, before the table's sort header
+    const dialog = await screen.findByRole("dialog");
+    expect((within(dialog).getByLabelText("Project") as HTMLSelectElement).value).toBe("");
+  });
+
   it("creates a task in a project", async () => {
     state = installFakeApi({ projects: [makeProject({ id: 3, title: "Quadruped Soccer" })] });
     renderApp("/projects/quadruped-soccer?tab=tasks");

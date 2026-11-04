@@ -126,3 +126,31 @@ def test_concurrent_create_with_same_client_key_updates_instead_of_500(ctx, monk
     monkeypatch.undo()
     with SessionLocal() as db:
         assert db.query(Task).filter(Task.client_key == "race").count() == 1
+
+
+def test_project_id_zero_filters_items_without_a_project(ctx):
+    p = mkproject(ctx)
+    due = (date.today() + timedelta(days=3)).isoformat()
+    loose = create(ctx, title="Loose", due_date=due)
+    create(ctx, title="In project", project_id=p['id'], due_date=due)
+    tasks = ctx.client.get('/api/v1/tasks', params={'project_id': 0}).json()['items']
+    assert [t['id'] for t in tasks] == [loose['id']]
+    dl = ctx.client.get('/api/v1/dashboard/deadlines', params={'project_id': 0}).json()
+    assert [(d['kind'], d['id']) for d in dl] == [('task', loose['id'])]
+    events = ctx.client.get('/api/v1/dashboard/activity', params={'project_id': 0}).json()['items']
+    assert events and all(e['project_id'] is None for e in events)
+    assert ctx.client.get('/api/v1/experiments', params={'project_id': 0}).json()['items'] == []
+    assert ctx.client.get('/api/v1/tasks', params={'project_id': -1}).status_code == 422
+
+
+def test_crowded_kanban_order_is_respaced_without_touching_updated_at(ctx):
+    a, b, c = (create(ctx, title=n) for n in 'ABC')
+    before = ctx.client.get(f"/api/v1/tasks/{a['id']}").json()['updated_at']
+    # midpoints halve the gap; a drop right next to A triggers respacing
+    r = ctx.client.patch(f"/api/v1/tasks/{c['id']}", json={'sort_order': a['sort_order'] + 1e-4}, headers=ctx.csrf)
+    assert r.status_code == 200
+    items = ctx.client.get('/api/v1/tasks', params={'sort': 'sort_order'}).json()['items']
+    assert [t['title'] for t in items] == ['A', 'C', 'B']
+    assert [t['sort_order'] for t in items] == [1024.0, 2048.0, 3072.0]
+    assert r.json()['sort_order'] == 2048.0
+    assert ctx.client.get(f"/api/v1/tasks/{a['id']}").json()['updated_at'] == before

@@ -30,12 +30,13 @@ from app.services import experiments as exp_svc
 from app.services import tasks as task_svc
 
 router = APIRouter()
+PROJECT_ID_DOC = "Filter by project id; 0 = only items without a project"
 
 
 # ---------------------------------------------------------------- tasks
 @router.get("/tasks", response_model=Page[TaskOut], tags=["tasks"])
 def list_tasks(
-    project_id: int | None = None,
+    project_id: int | None = Query(None, ge=0, description=PROJECT_ID_DOC),
     milestone_id: int | None = None,
     status: str | None = Query(None, description="Comma-separated: todo,in_progress,blocked,done,cancelled"),
     priority: str | None = None,
@@ -83,7 +84,7 @@ def delete_task(task_id: int, actor: Actor = Depends(get_actor), db: Session = D
 # ---------------------------------------------------------------- experiments
 @router.get("/experiments", response_model=Page[ExperimentOut], tags=["experiments"])
 def list_experiments(
-    project_id: int | None = None,
+    project_id: int | None = Query(None, ge=0, description=PROJECT_ID_DOC),
     status: str | None = None,
     group_name: str | None = None,
     type: str | None = None,
@@ -158,7 +159,7 @@ def dashboard_deadlines(
     start: date | None = Query(None, description="Explicit range start (inclusive), e.g. for a calendar month"),
     end: date | None = Query(None, description="Explicit range end (inclusive)"),
     include_overdue: bool = True,
-    project_id: int | None = None,
+    project_id: int | None = Query(None, ge=0, description=PROJECT_ID_DOC),
     kinds: str = Query("submission,milestone,task"),
     limit: int = Query(100, ge=1, le=500),
     actor: Actor = Depends(get_actor),
@@ -183,7 +184,7 @@ def dashboard_deadlines(
 
 @router.get("/dashboard/activity", response_model=Page[EventOut], tags=["dashboard"])
 def dashboard_activity(
-    project_id: int | None = None,
+    project_id: int | None = Query(None, ge=0, description=PROJECT_ID_DOC),
     source: str | None = None,
     event_type: str | None = None,
     since: datetime | None = None,
