@@ -86,7 +86,7 @@ class RateLimitMiddleware:
             return await self.app(scope, receive, send)
         client = scope.get("client") or ("unknown", 0)
         ip = client[0]
-        if path == "/api/v1/auth/login" and scope.get("method") == "POST":
+        if path in {"/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/invitation"} and scope.get("method") == "POST":
             if not self._allow(f"login:{ip}", self.login_per_minute):
                 return await _send_json(send, 429, "rate_limited", "Too many login attempts; wait a minute",
                                         [(b"retry-after", b"60")])

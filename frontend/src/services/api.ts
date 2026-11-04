@@ -1,6 +1,6 @@
 // Thin fetch wrapper: same-origin cookie session + CSRF header. No API tokens in the browser.
 import type {
-  ActivityEvent, ApiToken, DashboardSummary, DeadlineItem, Experiment, Me, Milestone, Page, Project, Run, Task,
+  ActivityEvent, ApiToken, DashboardSummary, DeadlineItem, Experiment, Invitation, ManagedUser, Me, Milestone, Page, Project, ProjectMember, Run, Task,
 } from "@/types/api";
 
 export class ApiError extends Error {
@@ -146,7 +146,21 @@ export interface RunInput {
 export const api = {
   uploadImage,
   me: () => get<Me>("/auth/me"),
-  login: (username: string, password: string) => post<{ username: string; csrf_token: string }>("/auth/login", { username, password }),
+  login: (username: string, password: string) => post<Me & { csrf_token: string }>("/auth/login", { username, password }),
+  register: (token: string, password: string) => post<Me & { csrf_token: string }>("/auth/register", { token, password }),
+  inspectInvitation: (token: string) => post<{ username: string; expires_at: string }>("/auth/invitation", { token }),
+  users: (offset = 0) => get<Page<ManagedUser>>("/users", { offset, limit: 50 }),
+  createUser: (username: string, is_admin: boolean) => post<Invitation>("/users", { username, is_admin }),
+  updateUser: (id: number, b: { is_admin?: boolean; is_active?: boolean }) => patch<ManagedUser>(`/users/${id}`, b),
+  renewInvitation: (id: number) => post<Invitation>(`/users/${id}/invitation`),
+  deleteUser: (id: number) => del<void>(`/users/${id}`),
+  members: (projectId: number, offset = 0) => get<Page<ProjectMember>>(`/projects/${projectId}/members`, { offset, limit: 50 }),
+  memberCandidates: (projectId: number, signal?: AbortSignal) => allPages(
+    (q) => get<Page<Pick<ProjectMember, "user_id" | "username">>>(`/projects/${projectId}/member-candidates`, q), {}, signal,
+  ),
+  addMember: (projectId: number, username: string) => post<void>(`/projects/${projectId}/members`, { username }),
+  removeMember: (projectId: number, userId: number) => del<void>(`/projects/${projectId}/members/${userId}`),
+  leaveProject: (projectId: number) => post<void>(`/projects/${projectId}/leave`),
   logout: () => post<{ ok: boolean }>("/auth/logout"),
   // The server rotates the CSRF token (and invalidates all other sessions) on password change.
   changePassword: (current_password: string, new_password: string) =>
@@ -162,6 +176,7 @@ export const api = {
   updateProject: (id: number, b: ProjectInput) => patch<Project>(`/projects/${id}`, b),
   reorderProjects: (ids: number[]) => post<void>("/projects/reorder", { ids }),
   archiveProject: (id: number) => del<Project>(`/projects/${id}`),
+  deleteProject: (id: number) => del<void>(`/projects/${id}/permanent`),
 
   milestones: (projectId: number) => get<Milestone[]>(`/projects/${projectId}/milestones`),
   createMilestone: (projectId: number, b: MilestoneInput) => post<Milestone>(`/projects/${projectId}/milestones`, b),
@@ -190,6 +205,8 @@ export const api = {
   summary: () => get<DashboardSummary>("/dashboard/summary"),
   deadlines: (q?: Query) => get<DeadlineItem[]>("/dashboard/deadlines", q),
   activity: (q?: Query) => get<Page<ActivityEvent>>("/dashboard/activity", q),
+  deleteActivity: (id: number) => del<void>(`/dashboard/activity/${id}`),
+  restoreActivity: (id: number) => post<void>(`/dashboard/activity/${id}/restore`),
   needsReview: (limit = 8) => get<Experiment[]>("/dashboard/needs-review", { limit }),
 
   tokens: () => get<ApiToken[]>("/tokens"),

@@ -16,6 +16,8 @@ class Actor:
     source: str  # one of SOURCES
     scopes: frozenset[str] = field(default_factory=lambda: frozenset({"read", "write"}))
     token_id: int | None = None
+    user_id: int | None = None
+    is_admin: bool = False
 
     @property
     def is_human(self) -> bool:
@@ -45,7 +47,9 @@ class Actor:
         # Humans can't impersonate agents and vice versa only for "manual".
         if self.is_agent and source == "manual":
             return self
-        return Actor(self.kind, self.name, source, self.scopes, self.token_id)
+        from dataclasses import replace
+
+        return replace(self, source=source)
 
 
 SYSTEM = Actor(kind="system", name="system", source="system")

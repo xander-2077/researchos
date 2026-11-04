@@ -7,17 +7,19 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.actor import Actor
 from app.core.enums import OPEN_MILESTONE_STATUSES, OPEN_TASK_STATUSES, PRIORITY_RANK
-from app.core.errors import ConfirmationRequired, Conflict, NotFound, ValidationFailed
-from app.models import Experiment, Milestone, ProgressEvent, Project, Task
+from app.core.errors import ConfirmationRequired, Conflict, Forbidden, NotFound, ValidationFailed
+from app.models import Experiment, Milestone, ProgressEvent, Project, ProjectMember, Task, User
 from app.repositories.base import apply_sort, clamp_limit
 from app.schemas.entities import ProjectCreate, ProjectUpdate
 from app.services.activity import log_event
+from app.services.access import project_filter, require_member_management, require_project
+from app.services.uploads import share_uploads
 
 SORTABLE = {"title", "stage", "priority", "health_status", "submission_deadline", "updated_at", "created_at"}
 HIGH_IMPACT_FIELDS = {"research_question", "hypothesis"}
@@ -50,7 +52,7 @@ def _unique_slug(db: Session, base: str) -> str:
     return slug
 
 
-def resolve_project(db: Session, ref: int | str) -> Project:
+def resolve_project(db: Session, ref: int | str, actor: Actor) -> Project:
     """Find a project by numeric id or slug.
 
     A reference made only of digits is *always* an id; slugs can never be all digits
@@ -65,7 +67,7 @@ def resolve_project(db: Session, ref: int | str) -> Project:
         raise NotFound(
             f"Project '{ref}' not found. Use list_projects (MCP) or GET /api/v1/projects to see valid ids/slugs."
         )
-    return project
+    return require_project(db, actor, project.id)
 
 
 def create_project(db: Session, actor: Actor, data: ProjectCreate) -> Project:
@@ -76,9 +78,12 @@ def create_project(db: Session, actor: Actor, data: ProjectCreate) -> Project:
         raise Conflict(f"Slug '{slug}' is already used by another project")
     payload["links"] = [link for link in payload["links"]]
     last = db.scalar(select(func.max(Project.sort_order))) or 0
-    project = Project(slug=slug, sort_order=last + 1, **payload)
+    project = Project(slug=slug, sort_order=last + 1, owner_id=actor.user_id, **payload)
     db.add(project)
     db.flush()
+    if actor.user_id is not None:
+        db.add(ProjectMember(project_id=project.id, user_id=actor.user_id))
+    share_uploads(db, actor, project.id, project.notes, project.description)
     log_event(
         db, actor, project_id=project.id, event_type="project_created",
         summary=f"Project created: {project.title}", resource_type="project", resource_id=project.id,
@@ -90,9 +95,7 @@ def create_project(db: Session, actor: Actor, data: ProjectCreate) -> Project:
 
 def update_project(db: Session, actor: Actor, project_id: int, data: ProjectUpdate) -> Project:
     actor.require_write()
-    project = db.get(Project, project_id)
-    if project is None:
-        raise NotFound(f"Project {project_id} not found")
+    project = require_project(db, actor, project_id)
     changes = data.model_dump(exclude_unset=True)
     confirm = changes.pop("confirm", False)
     expected_version = changes.pop("version", None)
@@ -125,6 +128,7 @@ def update_project(db: Session, actor: Actor, project_id: int, data: ProjectUpda
     if "slug" in changes:
         if db.scalar(select(Project.id).where(Project.slug == changes["slug"], Project.id != project.id)):
             raise Conflict(f"Slug '{changes['slug']}' is already in use")
+    share_uploads(db, actor, project.id, *(changes[k] or "" for k in ("notes", "description") if k in changes))
 
     old_stage, old_health = project.stage, project.health_status
     if expected_version is not None:
@@ -182,6 +186,20 @@ def update_project(db: Session, actor: Actor, project_id: int, data: ProjectUpda
         raise Conflict("Update violates a uniqueness constraint") from e
     db.refresh(project)
     return project
+
+
+def delete_project(db: Session, actor: Actor, project_id: int) -> None:
+    actor.require_write()
+    project = require_project(db, actor, project_id)
+    if actor.kind != "user" or actor.user_id != project.owner_id:
+        raise Forbidden("Only the project owner can permanently delete the project")
+    log_event(
+        db, actor, project_id=None, event_type="project_deleted",
+        summary=f"Project deleted: {project.title}", resource_type="project", resource_id=project.id,
+    )
+    # Foreign-key cascades remove the project's resources in the same transaction.
+    db.execute(delete(Project).where(Project.id == project.id))
+    db.commit()
 
 
 def archive_project(db: Session, actor: Actor, project_id: int, *, confirm: bool = False) -> Project:
@@ -282,7 +300,7 @@ def list_projects(
     offset: int | None = None,
 ) -> tuple[list[dict[str, Any]], int, int, int]:
     actor.require_read()
-    stmt = select(Project)
+    stmt = select(Project).where(project_filter(actor))
     if archived is not None:
         stmt = stmt.where(Project.archived == archived)
     for col, val in ((Project.stage, stage), (Project.health_status, health_status), (Project.priority, priority)):
@@ -323,11 +341,11 @@ def reorder_projects(db: Session, actor: Actor, ids: list[int]) -> None:
     is not an edit of the project and must not invalidate open edit forms)."""
     actor.require_write()
     want = list(dict.fromkeys(ids))
-    known = set(db.scalars(select(Project.id).where(Project.id.in_(want))))
+    known = set(db.scalars(select(Project.id).where(Project.id.in_(want), project_filter(actor))))
     missing = [i for i in want if i not in known]
     if missing:
         raise NotFound(f"Unknown project id(s): {missing}")
-    rest = [i for i in db.scalars(select(Project.id).order_by(Project.sort_order, Project.id)) if i not in set(want)]
+    rest = [i for i in db.scalars(select(Project.id).where(project_filter(actor)).order_by(Project.sort_order, Project.id)) if i not in set(want)]
     for pos, pid in enumerate(want + rest, start=1):
         db.execute(
             update(Project).where(Project.id == pid)
@@ -348,3 +366,67 @@ def validate_milestone_belongs(db: Session, project_id: int | None, milestone_id
     m = db.get(Milestone, milestone_id)
     if m is None or m.project_id != project_id:
         raise ValidationFailed(f"Milestone {milestone_id} does not belong to project {project_id}")
+
+
+def list_members(db: Session, actor: Actor, project_id: int, limit: int | None = None, offset: int = 0):
+    from app.repositories.base import paginate
+
+    project = require_project(db, actor, project_id)
+    rows, total, lim, off = paginate(db, select(User).join(ProjectMember).where(
+        ProjectMember.project_id == project_id,
+    ).order_by(User.id), limit, offset)
+    return [{"user_id": u.id, "username": u.username, "is_active": u.is_active,
+             "is_owner": u.id == project.owner_id} for u in rows], total, lim, off
+
+
+def list_member_candidates(db: Session, actor: Actor, project_id: int, limit: int | None = None, offset: int = 0):
+    from app.repositories.base import paginate
+
+    require_member_management(db, actor, project_id)
+    rows, total, lim, off = paginate(db, select(User).where(
+        User.is_active.is_(True), User.password_hash != "", User.username != "admin",
+        User.id.not_in(select(ProjectMember.user_id).where(ProjectMember.project_id == project_id)),
+    ).order_by(User.username, User.id), limit, offset)
+    return [{"user_id": u.id, "username": u.username} for u in rows], total, lim, off
+
+
+def add_member(db: Session, actor: Actor, project_id: int, username: str) -> None:
+    actor.require_write()
+    require_member_management(db, actor, project_id)
+    user = db.scalar(select(User).where(User.username == username, User.is_active.is_(True)))
+    if user is None:
+        raise NotFound("Enabled user not found")
+    if db.get(ProjectMember, (project_id, user.id)) is not None:
+        return
+    db.add(ProjectMember(project_id=project_id, user_id=user.id))
+    log_event(db, actor, project_id=project_id, event_type="member_added", summary=f"Member added: {user.username}")
+    db.commit()
+
+
+def leave_project(db: Session, actor: Actor, project_id: int) -> None:
+    actor.require_write()
+    if actor.kind != "user":
+        raise Forbidden("Only a logged-in user can leave a project")
+    project = require_project(db, actor, project_id)
+    if project.owner_id == actor.user_id:
+        raise ValidationFailed("The project owner cannot leave the project")
+    member = db.get(ProjectMember, (project_id, actor.user_id))
+    if member is None:
+        raise NotFound("Member not found")
+    db.delete(member)
+    log_event(db, actor, project_id=project_id, event_type="member_left", summary=f"Member left: {actor.name}")
+    db.commit()
+
+
+def remove_member(db: Session, actor: Actor, project_id: int, user_id: int) -> None:
+    actor.require_write()
+    project = require_member_management(db, actor, project_id)
+    if project.owner_id == user_id:
+        raise ValidationFailed("The project owner cannot be removed")
+    member = db.get(ProjectMember, (project_id, user_id))
+    if member is None:
+        raise NotFound("Member not found")
+    user = db.get(User, user_id)
+    db.delete(member)
+    log_event(db, actor, project_id=project_id, event_type="member_removed", summary=f"Member removed: {user.username}")
+    db.commit()

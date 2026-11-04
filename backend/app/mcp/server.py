@@ -191,7 +191,7 @@ async def get_project(
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
         actor.require_read()
-        p = proj_svc.resolve_project(db, project)
+        p = proj_svc.resolve_project(db, project, actor)
         s = proj_svc.project_summary(db, p)
         out: dict[str, Any] = {
             **_project_brief(s),
@@ -263,7 +263,7 @@ async def query_work(
     Due-date filters do not apply to experiments. Read-only."""
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
-        pid = proj_svc.resolve_project(db, project).id if project else None
+        pid = proj_svc.resolve_project(db, project, actor).id if project else None
         res = dash_svc.query_work(
             db, actor, resource_type=resource_type, project_id=pid, status=status, due_before=due_before,
             due_after=due_after, priority=priority, keyword=keyword, limit=limit,
@@ -315,7 +315,7 @@ async def upsert_task(
         fields["project_id"] = None
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
-        p = proj_svc.resolve_project(db, project) if project is not None else None
+        p = proj_svc.resolve_project(db, project, actor) if project is not None else None
         t, created = task_svc.upsert_task(db, actor, p.id if p else None, task_id, client_key, fields)
         return {
             "task_id": t.id, "project": t.project.slug if t.project else None, "created": created, "title": t.title, "status": t.status,
@@ -345,7 +345,7 @@ async def upsert_milestone(
                                    "due_date": due_date}, nullable=("due_date",))
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
-        p = proj_svc.resolve_project(db, project)
+        p = proj_svc.resolve_project(db, project, actor)
         if milestone_id is None and "title" not in fields:
             raise ToolError("[validation_error] title is required when creating a milestone")
         m, created = ms_svc.upsert_milestone(db, actor, p.id, milestone_id, fields)
@@ -406,7 +406,7 @@ async def record_experiment(
     )
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
-        p = proj_svc.resolve_project(db, project)
+        p = proj_svc.resolve_project(db, project, actor)
         res = exp_svc.record_experiment(db, actor, p.id, params)
         e, r = res["experiment"], res["run"]
         out: dict[str, Any] = {
@@ -442,7 +442,7 @@ async def log_progress(
     Use after meaningful work — not for every small edit."""
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
-        p = proj_svc.resolve_project(db, project)
+        p = proj_svc.resolve_project(db, project, actor)
         ev = act_svc.add_progress(db, actor, p.id, ProgressCreate(
             summary=summary, details=details or "", related_resource_type=related_resource_type,
             related_resource_id=related_resource_id, source=source,
@@ -481,7 +481,7 @@ async def update_project(
         changes["stage"] = changes.pop("research_stage")
 
     def fn(db: Session, actor: Actor) -> dict[str, Any]:
-        p = proj_svc.resolve_project(db, project)
+        p = proj_svc.resolve_project(db, project, actor)
         before = {k: getattr(p, k) for k in changes}
         p = proj_svc.update_project(db, actor, p.id, ProjectUpdate(**changes, confirm=confirm))
         changed = {k: {"from": _iso(before[k]), "to": _iso(getattr(p, k))} for k in changes if before[k] != getattr(p, k)}

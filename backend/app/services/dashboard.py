@@ -13,6 +13,7 @@ from app.core.enums import OPEN_MILESTONE_STATUSES, OPEN_TASK_STATUSES, PRIORITY
 from app.core.errors import ValidationFailed
 from app.models import Experiment, Milestone, Project, Task
 from app.repositories.base import by_project, clamp_limit
+from app.services.access import project_filter, task_filter
 from app.services import experiments as exp_svc
 from app.services import tasks as task_svc
 
@@ -23,8 +24,8 @@ def summary(db: Session, actor: Actor, horizon_days: int = 14) -> dict[str, int]
     actor.require_read()
     today = date.today()
     horizon = today + timedelta(days=horizon_days)
-    live = Project.archived.is_(False)
-    live_task = Task.project_id.is_(None) | live
+    live = Project.archived.is_(False) & project_filter(actor)
+    live_task = (Task.project_id.is_(None) | Project.archived.is_(False)) & task_filter(actor)
 
     def count(stmt) -> int:  # noqa: ANN001
         return db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
@@ -84,6 +85,7 @@ def deadlines_between(
 
     items: list[dict[str, Any]] = []
     proj_filter = [] if include_archived else [Project.archived.is_(False)]
+    proj_filter.append(project_filter(actor))
     if project_id is not None:
         proj_filter.append(Project.id == project_id)
 
@@ -108,12 +110,14 @@ def deadlines_between(
         ):
             items.append(item("milestone", m.id, m.title, m.due_date, m.project, status=m.status))
     if "task" in kinds:
-        task_filter = [] if include_archived else [Task.project_id.is_(None) | Project.archived.is_(False)]
+        task_conditions = [task_filter(actor)]
+        if not include_archived:
+            task_conditions.append(Task.project_id.is_(None) | Project.archived.is_(False))
         if project_id is not None:
-            task_filter.append(by_project(Task.project_id, project_id))
+            task_conditions.append(by_project(Task.project_id, project_id))
         for t in db.scalars(
             select(Task).outerjoin(Project).options(joinedload(Task.project))
-            .where(*task_filter, Task.status.in_(OPEN_TASK_STATUSES), *in_range(Task.due_date))
+            .where(*task_conditions, Task.status.in_(OPEN_TASK_STATUSES), *in_range(Task.due_date))
         ):
             items.append(item("task", t.id, t.title, t.due_date, t.project, status=t.status, priority=t.priority))
     items.sort(key=lambda i: (i["due_date"], DEADLINE_KINDS.index(i["kind"]), PRIORITY_RANK.get(i["priority"] or "", 9)))
@@ -154,7 +158,7 @@ def query_work(
              "tags": t.tags, "overdue": bool(t.due_date and t.due_date < date.today() and t.status in OPEN_TASK_STATUSES)}
             for t in rows]}
     if resource_type == "milestone":
-        stmt = select(Milestone).join(Project).options(joinedload(Milestone.project)).where(Project.archived.is_(False))
+        stmt = select(Milestone).join(Project).options(joinedload(Milestone.project)).where(Project.archived.is_(False), project_filter(actor))
         if project_id is not None:
             stmt = stmt.where(Milestone.project_id == project_id)
         if status:

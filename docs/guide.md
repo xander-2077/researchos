@@ -6,6 +6,16 @@ experiments in the browser, and let Claude Code or Codex read and update them ov
 > This is the quick guide. Detailed references are listed on the left: MCP integration,
 > deployment, architecture, and the agent instruction templates.
 
+## Accounts and collaboration
+
+Administrators create users in **Settings → User management → New user**, then copy and share the invitation link. The recipient chooses a password (at least 10 characters) and signs in. Links expire after seven days and work once; generating a new link invalidates the previous one. No email service is needed.
+
+The project owner or an administrator adds existing usernames under the project's **Members** tab. Members can manage the project's research data together; only the owner and administrators manage membership. Regular users see only projects they create or join. Administrators can access all projects. Tasks without a project belong to their creator and are hidden from other regular users; administrators retain access. Images are visible to their uploader and members of projects that reference them.
+
+Each user creates personal API/MCP tokens in Settings. Tokens follow their owner's project access. Removing a member revokes project access; disabling an account signs it out and permanently revokes its existing tokens. At least one registered, active administrator must remain. **Delete user** requires confirmation and permanently removes the account, invitations and personal tokens. Projects, personal tasks and image ownership transfer to the administrator performing the deletion; research data and activity remain. You cannot delete your current account.
+
+On upgrade, existing users retain administrator access and membership in existing projects. The earliest user owns existing projects and tokens. Ownerless tokens created through the CLI remain global maintenance credentials.
+
 ## 1. Concepts
 
 | Concept | Meaning |

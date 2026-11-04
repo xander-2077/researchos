@@ -28,6 +28,16 @@ const fields = (s: string) => s.split(",").map((f) => FIELD[f.trim()] ?? f.trim(
 type Rule = [RegExp, (...m: string[]) => string];
 
 const ZH_RULES: Rule[] = [
+  [/^User deleted: (.*)$/s, (x) => `删除用户：${x}`],
+  [/^User invited: (.*)$/s, (x) => `邀请用户：${x}`],
+  [/^Invitation renewed: (.*)$/s, (x) => `更新邀请：${x}`],
+  [/^User registered: (.*)$/s, (x) => `用户完成注册：${x}`],
+  [/^User updated: (.*)$/s, (x) => `更新用户：${x}`],
+  [/^Member added: (.*)$/s, (x) => `添加成员：${x}`],
+  [/^Member removed: (.*)$/s, (x) => `移除成员：${x}`],
+  [/^Member left: (.*)$/s, (x) => `成员退出：${x}`],
+  [/^API token created: (.*)$/s, (x) => `创建 API 令牌：${x}`],
+  [/^API token revoked: (.*)$/s, (x) => `撤销 API 令牌：${x}`],
   [/^Project created: (.*)$/s, (x) => `创建项目：${x}`],
   [/^Stage changed: (.*) → (.*)$/, (a, b) => `阶段变更：${L(a)} → ${L(b)}`],
   [/^Health changed: (.*) → (.*)$/, (a, b) => `健康度变更：${L(a)} → ${L(b)}`],

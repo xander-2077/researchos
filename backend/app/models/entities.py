@@ -59,6 +59,8 @@ class TimestampMixin:
 
 class User(Base):
     __tablename__ = "users"
+    # Deleted account ids must never be reused: old signed sessions contain the user id.
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True)
@@ -68,12 +70,45 @@ class User(Base):
     # Bumped whenever the password changes; sessions carry the value they were issued with, so every
     # older session (e.g. a stolen cookie) stops working immediately.
     session_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+
+
+class UserInvitation(Base):
+    __tablename__ = "user_invitations"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+
+class UploadOwner(Base):
+    __tablename__ = "upload_owners"
+
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+
+class UploadProject(Base):
+    __tablename__ = "upload_projects"
+
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
 
 
 class Project(TimestampMixin, Base):
     __tablename__ = "projects"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
@@ -124,11 +159,12 @@ class Task(TimestampMixin, Base):
     __tablename__ = "tasks"
     __table_args__ = (
         UniqueConstraint("project_id", "client_key", name="uq_task_client_key"),
-        Index("uq_task_standalone_client_key", "client_key", unique=True,
+        Index("uq_task_standalone_client_key", "owner_id", "client_key", unique=True,
               sqlite_where=text("project_id IS NULL"), postgresql_where=text("project_id IS NULL")),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     milestone_id: Mapped[int | None] = mapped_column(
         ForeignKey("milestones.id", ondelete="SET NULL"), index=True
@@ -222,12 +258,14 @@ class ExperimentRun(TimestampMixin, Base):
 
 
 class ProgressEvent(Base):
-    """Append-only activity / progress log."""
+    """Activity / progress log with reversible deletion."""
 
     __tablename__ = "progress_events"
     __table_args__ = (Index("ix_events_project_created", "project_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
@@ -247,6 +285,7 @@ class ApiToken(Base):
     __tablename__ = "api_tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     token_prefix: Mapped[str] = mapped_column(String(16))  # for display only
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)

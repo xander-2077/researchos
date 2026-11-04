@@ -236,7 +236,7 @@ def test_metrics_with_same_unit_still_aggregate(ctx: Ctx):
 
 # ===================================================================== P2: optimistic locking must be atomic
 def _user_actor() -> Actor:
-    return Actor(kind="user", name="admin", source="manual")
+    return Actor(kind="user", name="admin", source="manual", user_id=1, is_admin=True)
 
 
 def test_stale_loaded_project_cannot_overwrite(ctx: Ctx):

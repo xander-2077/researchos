@@ -22,9 +22,11 @@ from app.auth.actor import Actor
 from app.core.enums import EXPERIMENT_STATUSES
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.models import Experiment, ExperimentRun, Project
-from app.repositories.base import apply_sort, get_or_404, paginate
+from app.repositories.base import apply_sort, paginate
 from app.schemas.entities import ExperimentCreate, ExperimentUpdate, RunCreate, RunUpdate
 from app.services.activity import log_event
+from app.services.access import project_filter, project_resource, require_project
+from app.services.uploads import share_uploads
 
 SORTABLE = {"name", "status", "group_name", "type", "created_at", "updated_at"}
 # Once an experiment/run is verified, *any* change by an agent is a change to verified evidence
@@ -116,7 +118,7 @@ def list_experiments(
 ):
     actor.require_read()
     stmt = (
-        select(Experiment)
+        select(Experiment).where(project_filter(actor, Experiment.project_id))
         .join(Project)
         .options(joinedload(Experiment.project), selectinload(Experiment.runs))
     )
@@ -157,12 +159,12 @@ def list_experiments(
 
 def get_experiment(db: Session, actor: Actor, experiment_id: int) -> Experiment:
     actor.require_read()
-    return get_or_404(db, Experiment, experiment_id, "Experiment")
+    return project_resource(db, actor, Experiment, experiment_id, "Experiment")
 
 
 def list_runs(db: Session, actor: Actor, experiment_id: int) -> list[ExperimentRun]:
     actor.require_read()
-    get_or_404(db, Experiment, experiment_id, "Experiment")
+    project_resource(db, actor, Experiment, experiment_id, "Experiment")
     return list(
         db.scalars(select(ExperimentRun).where(ExperimentRun.experiment_id == experiment_id).order_by(ExperimentRun.id))
     )
@@ -186,6 +188,7 @@ def _apply_experiment_changes(db: Session, actor: Actor, e: Experiment, changes:
         if changes["status"] == "verified":  # pragma: no cover - guarded above
             changes["status"] = "needs_review"
     old_status = e.status
+    share_uploads(db, actor, e.project_id, *(changes[k] or "" for k in ("description", "conclusion") if k in changes))
     for k, v in changes.items():
         setattr(e, k, v)
     if "status" in changes:
@@ -201,7 +204,7 @@ def _apply_experiment_changes(db: Session, actor: Actor, e: Experiment, changes:
 
 def create_experiment(db: Session, actor: Actor, data: ExperimentCreate, *, commit: bool = True) -> Experiment:
     actor.require_write()
-    get_or_404(db, Project, data.project_id, "Project")
+    require_project(db, actor, data.project_id)
     _forbid_agent_verify(actor, "status", data.status)
     key = data.experiment_key or _key_from_name(data.name)
     if db.scalar(select(Experiment.id).where(Experiment.project_id == data.project_id, Experiment.experiment_key == key)):
@@ -209,6 +212,7 @@ def create_experiment(db: Session, actor: Actor, data: ExperimentCreate, *, comm
     e = Experiment(**data.model_dump(exclude={"experiment_key"}), experiment_key=key)
     db.add(e)
     db.flush()
+    share_uploads(db, actor, e.project_id, e.description, e.conclusion)
     log_event(db, actor, project_id=e.project_id, event_type="experiment_created",
               summary=f"Experiment recorded: {e.name}" + (f" ({e.group_name})" if e.group_name else ""),
               resource_type="experiment", resource_id=e.id)
@@ -220,7 +224,7 @@ def create_experiment(db: Session, actor: Actor, data: ExperimentCreate, *, comm
 
 def update_experiment(db: Session, actor: Actor, experiment_id: int, data: ExperimentUpdate) -> Experiment:
     actor.require_write()
-    e = get_or_404(db, Experiment, experiment_id, "Experiment")
+    e = project_resource(db, actor, Experiment, experiment_id, "Experiment")
     changes = data.model_dump(exclude_unset=True)
     confirm = changes.pop("confirm_overwrite_verified", False)
     _apply_experiment_changes(db, actor, e, changes, confirm)
@@ -231,7 +235,7 @@ def update_experiment(db: Session, actor: Actor, experiment_id: int, data: Exper
 
 def delete_experiment(db: Session, actor: Actor, experiment_id: int) -> None:
     actor.require_write()
-    e = get_or_404(db, Experiment, experiment_id, "Experiment")
+    e = project_resource(db, actor, Experiment, experiment_id, "Experiment")
     if not actor.is_human:
         raise Forbidden("Experiments can only be deleted from the web UI.")
     log_event(db, actor, project_id=e.project_id, event_type="experiment_deleted",
@@ -275,6 +279,7 @@ def _apply_run_changes(
                 code="verified_protected",
             )
         changes["verification_status"] = "needs_review"
+    share_uploads(db, actor, run.experiment.project_id, changes.get("conclusion", "") or "")
     for k, v in changes.items():
         setattr(run, k, v)
     return sorted(changes)
@@ -285,7 +290,7 @@ def upsert_run(
 ) -> tuple[ExperimentRun, bool]:
     """Create run or update existing one with same external_run_id. Returns (run, created)."""
     actor.require_write()
-    e = get_or_404(db, Experiment, experiment_id, "Experiment")
+    e = project_resource(db, actor, Experiment, experiment_id, "Experiment")
     fields = _run_fields(data)
     run = db.scalar(
         select(ExperimentRun).where(
@@ -314,6 +319,7 @@ def upsert_run(
     except IntegrityError as exc:  # concurrent duplicate submission
         db.rollback()
         raise Conflict(f"Run '{data.external_run_id}' was created concurrently; retry the call") from exc
+    share_uploads(db, actor, e.project_id, run.conclusion)
     metrics_txt = ", ".join(
         f"{k}={v.get('value')}{_unit(v.get('unit'))}" for k, v in list((run.metrics_json or {}).items())[:4]
     )
@@ -331,7 +337,7 @@ def upsert_run(
 
 def update_run(db: Session, actor: Actor, run_id: int, data: RunUpdate) -> ExperimentRun:
     actor.require_write()
-    run = get_or_404(db, ExperimentRun, run_id, "Run")
+    run = project_resource(db, actor, ExperimentRun, run_id, "Run")
     changed = _apply_run_changes(
         db, actor, run, _run_fields(data), data.confirm_overwrite_verified, metrics_mode=data.metrics_mode
     )
@@ -349,7 +355,7 @@ def update_run(db: Session, actor: Actor, run_id: int, data: RunUpdate) -> Exper
 
 def delete_run(db: Session, actor: Actor, run_id: int) -> None:
     actor.require_write()
-    run = get_or_404(db, ExperimentRun, run_id, "Run")
+    run = project_resource(db, actor, ExperimentRun, run_id, "Run")
     if not actor.is_human:
         raise Forbidden("Runs can only be deleted from the web UI.")
     e = run.experiment
@@ -363,7 +369,7 @@ def record_experiment(db: Session, actor: Actor, project_id: int, p: dict[str, A
     """Upsert an experiment (by experiment_key) and optionally one run (by external_run_id)
     in a single transaction. Agent-created experiments default to ``needs_review``."""
     actor.require_write()
-    get_or_404(db, Project, project_id, "Project")
+    require_project(db, actor, project_id)
     key = p.get("experiment_key")
     if not key:
         raise ValidationFailed("experiment_key is required (a stable id such as 'no-world-model-ablation')")

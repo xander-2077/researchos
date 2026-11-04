@@ -53,6 +53,7 @@ export interface DeadlineRef {
 }
 
 export interface Project {
+  owner_id?: number | null;
   id: number;
   slug: string;
   title: string;
@@ -188,6 +189,7 @@ export interface Experiment {
 
 export interface ActivityEvent {
   id: number;
+  deleted_at?: string | null;
   project_id: number | null;
   related_resource_type: string;
   related_resource_id: number | null;
@@ -238,8 +240,33 @@ export interface ApiToken {
 }
 
 export interface Me {
+  user_id?: number;
+  is_admin?: boolean;
   authenticated: boolean;
   username?: string;
   csrf_token?: string;
   setup_required?: boolean;
+}
+
+export interface ManagedUser {
+  id: number;
+  username: string;
+  is_admin: boolean;
+  is_active: boolean;
+  registered: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface Invitation {
+  user: ManagedUser;
+  invitation_path: string;
+  expires_at: string;
+}
+
+export interface ProjectMember {
+  user_id: number;
+  username: string;
+  is_active: boolean;
+  is_owner: boolean;
 }
